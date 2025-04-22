@@ -1,0 +1,6 @@
+Django~=5.0          # current LTS
+djangorestframework~=3.16
+django-cors-headers~=4.3
+# Optional “nice to have”:
+# dj-rest-auth~=5.0
+# djangorestframework-simplejwt~=5.3

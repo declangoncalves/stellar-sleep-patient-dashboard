@@ -1,0 +1,9 @@
+# Python
+.venv/
+__pycache__/
+
+# Node
+frontend/node_modules/
+
+# Env / local config
+*.env
