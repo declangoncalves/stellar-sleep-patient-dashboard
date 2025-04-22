@@ -1,0 +1,27 @@
+[
+  {
+    "model": "patients.patient",
+    "pk": 1,
+    "fields": {
+      "first_name": "Alice",
+      "middle_name": "",
+      "last_name": "Smith",
+      "date_of_birth": "1985-07-12",
+      "status": "active",
+      "extra_data": {"notes": "VIP patient", "score": 42}
+    }
+  },
+  {
+    "model": "patients.address",
+    "pk": 1,
+    "fields": {
+      "patient": 1,
+      "address_line1": "123 Main St",
+      "address_line2": "",
+      "city": "Springfield",
+      "state": "IL",
+      "postal_code": "62701",
+      "country": "USA"
+    }
+  }
+]
