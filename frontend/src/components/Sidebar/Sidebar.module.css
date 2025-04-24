@@ -1,0 +1,7 @@
+.logoWrapper {
+  height: var(--navbar-height);
+}
+
+.sidebar {
+  background: var(--secondary);
+}
