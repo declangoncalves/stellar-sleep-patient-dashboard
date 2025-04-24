@@ -154,23 +154,50 @@ export default function PatientsPage() {
         </div>
       ) : (
         <>
-          <ul className="space-y-2">
-            {patients.map((patient, index) => (
-              <li
-                key={patient.id}
-                ref={index === patients.length - 1 ? lastPatientRef : null}
-                className="text-black"
-                onClick={() => setSelectedPatient(patient)}
+          {patients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+              <svg
+                className="w-16 h-16 mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <PatientListCard patient={patient} />
-              </li>
-            ))}
-          </ul>
-
-          {isLoadingMore && (
-            <div className="flex justify-center items-center my-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-xl font-medium">No patients found</p>
+              <p className="text-sm mt-2">
+                {debouncedSearchQuery
+                  ? 'Try adjusting your search or filters'
+                  : 'Try adjusting your filters'}
+              </p>
             </div>
+          ) : (
+            <>
+              <ul className="space-y-2">
+                {patients.map((patient, index) => (
+                  <li
+                    key={patient.id}
+                    ref={index === patients.length - 1 ? lastPatientRef : null}
+                    className="text-black"
+                    onClick={() => setSelectedPatient(patient)}
+                  >
+                    <PatientListCard patient={patient} />
+                  </li>
+                ))}
+              </ul>
+
+              {isLoadingMore && (
+                <div className="flex justify-center items-center my-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
