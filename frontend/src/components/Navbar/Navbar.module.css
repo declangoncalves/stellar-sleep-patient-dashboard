@@ -1,6 +1,0 @@
-.navbar {
-  /* use your custom property */
-  background-color: var(--secondary);
-  color: var(--foreground);
-  height: var(--navbar-height);
-}

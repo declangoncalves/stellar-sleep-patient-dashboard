@@ -4,7 +4,6 @@
 import { ReactNode } from 'react';
 // import Link from "next/link";
 import { Sidebar } from './Sidebar/Sidebar';
-import { Navbar } from './Navbar/Navbar';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -22,11 +21,6 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col">
-        {/* Top navbar */}
-        <header className="bg-white border-b shadow-sm">
-          <Navbar />
-        </header>
-
         {/* Page content */}
         <main className="flex-1 overflow-auto p-6 bg-white">{children}</main>
       </div>

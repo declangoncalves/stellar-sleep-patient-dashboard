@@ -7,17 +7,25 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 interface SearchbarProps {
   placeholder?: string;
   onSearch?: (query: string) => void;
+  onChange?: (query: string) => void;
 }
 
 export function Searchbar({
   placeholder = 'Search appointment, patient or etc…',
   onSearch,
+  onChange,
 }: SearchbarProps) {
   const [query, setQuery] = useState('');
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (onSearch) onSearch(query.trim());
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    if (onChange) onChange(newQuery.trim());
   }
 
   return (
@@ -32,7 +40,7 @@ export function Searchbar({
       <input
         type="text"
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={handleChange}
         placeholder={placeholder}
         className="flex-1 px-3 py-2 text-gray-700 placeholder-gray-400 focus:outline-none"
       />
