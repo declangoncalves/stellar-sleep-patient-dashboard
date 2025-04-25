@@ -182,7 +182,7 @@ export default function PatientsPage() {
               <ul className="space-y-2">
                 {patients.map((patient, index) => (
                   <li
-                    key={patient.id}
+                    key={`${patient.id}-${index}`}
                     ref={index === patients.length - 1 ? lastPatientRef : null}
                     className="text-black"
                     onClick={() => setSelectedPatient(patient)}
