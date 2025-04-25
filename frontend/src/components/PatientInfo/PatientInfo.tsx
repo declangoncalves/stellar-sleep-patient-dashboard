@@ -15,6 +15,22 @@ interface FormData extends Omit<Patient, 'addresses'> {
   addresses: (Address | (Omit<Address, 'id'> & { id: number | null }))[];
 }
 
+interface AddressError {
+  address_line1?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
+interface ValidationErrors {
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  status?: string;
+  addresses?: { [key: number]: AddressError };
+}
+
 export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
   const [formData, setFormData] = useState<FormData>({
     ...patient,
@@ -24,65 +40,118 @@ export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>(
     'idle',
   );
+  const [errors, setErrors] = useState<ValidationErrors>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: ValidationErrors = {};
+    let isValid = true;
+
+    // Validate patient fields
+    if (!formData.first_name?.trim()) {
+      newErrors.first_name = 'First name is required';
+      isValid = false;
+    }
+    if (!formData.last_name?.trim()) {
+      newErrors.last_name = 'Last name is required';
+      isValid = false;
+    }
+    if (!formData.date_of_birth) {
+      newErrors.date_of_birth = 'Date of birth is required';
+      isValid = false;
+    }
+    if (!formData.status) {
+      newErrors.status = 'Status is required';
+      isValid = false;
+    }
+
+    // Validate addresses
+    const addressErrors: { [key: number]: AddressError } = {};
+    formData.addresses.forEach((addr, index) => {
+      const errors: AddressError = {};
+      if (!addr.address_line1?.trim()) {
+        errors.address_line1 = 'Address line 1 is required';
+        isValid = false;
+      }
+      if (!addr.city?.trim()) {
+        errors.city = 'City is required';
+        isValid = false;
+      }
+      if (!addr.state?.trim()) {
+        errors.state = 'State is required';
+        isValid = false;
+      }
+      if (!addr.postal_code?.trim()) {
+        errors.postal_code = 'Postal code is required';
+        isValid = false;
+      }
+      if (!addr.country?.trim()) {
+        errors.country = 'Country is required';
+        isValid = false;
+      }
+      if (Object.keys(errors).length > 0) {
+        addressErrors[index] = errors;
+      }
+    });
+
+    if (Object.keys(addressErrors).length > 0) {
+      newErrors.addresses = addressErrors;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error when field is modified
+    if (errors[name as keyof ValidationErrors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSaving(true);
     try {
-      console.log('Saving patient:', formData);
       // First update the patient
-      const patientResponse = await axios.put(
-        `http://127.0.0.1:8000/api/patients/${formData.id}/`,
-        {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          middle_name: formData.middle_name,
-          date_of_birth: formData.date_of_birth,
-          status: formData.status,
-        },
-      );
-      console.log('Patient update response:', patientResponse.data);
+      await axios.put(`http://127.0.0.1:8000/api/patients/${formData.id}/`, {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        middle_name: formData.middle_name,
+        date_of_birth: formData.date_of_birth,
+        status: formData.status,
+      });
 
       // Then handle addresses
       for (const address of formData.addresses) {
-        console.log('Processing address:', address);
         if (address.id && address.id < 1000) {
-          // Assuming real IDs are less than 1000
-          // Update existing address
-          const addressResponse = await axios.put(
+          await axios.put(
             `http://127.0.0.1:8000/api/addresses/${address.id}/`,
             {
               ...address,
               patient: formData.id,
             },
           );
-          console.log('Address update response:', addressResponse.data);
         } else {
-          // Create new address
           const addressData = { ...address } as Omit<Address, 'id'>;
-          const addressResponse = await axios.post(
-            'http://127.0.0.1:8000/api/addresses/',
-            {
-              ...addressData,
-              patient: formData.id,
-            },
-          );
-          console.log('Address create response:', addressResponse.data);
+          await axios.post('http://127.0.0.1:8000/api/addresses/', {
+            ...addressData,
+            patient: formData.id,
+          });
         }
       }
 
-      // Convert FormData to Patient type before calling onSaved
       const updatedPatient: Patient = {
         ...formData,
         addresses: formData.addresses.map(addr => ({
           ...addr,
-          id: addr.id || 0, // Convert null to 0 for new addresses
+          id: addr.id || 0,
         })),
       };
 
@@ -90,9 +159,6 @@ export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
       onSaved(updatedPatient);
     } catch (err) {
       console.error('Save error:', err);
-      if (axios.isAxiosError(err)) {
-        console.error('Error response:', err.response?.data);
-      }
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
@@ -125,38 +191,61 @@ export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
     },
   );
 
+  const inputErrorClasses =
+    'border-red-500 focus:ring-red-500 focus:border-red-500';
+  const errorMessageClasses = 'text-red-500 text-sm mt-1';
+
   return (
     <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md p-6 space-y-6 overflow-auto">
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <input
-          name="first_name"
-          value={formData.first_name}
-          onChange={handleChange}
-          className="p-2 border rounded w-full text-black"
-          placeholder="First name"
-        />
+        <div>
+          <input
+            name="first_name"
+            value={formData.first_name}
+            onChange={handleChange}
+            className={`p-2 border rounded w-full text-black ${errors.first_name ? inputErrorClasses : ''}`}
+            placeholder="First name"
+          />
+          {errors.first_name && (
+            <p className={errorMessageClasses}>{errors.first_name}</p>
+          )}
+        </div>
 
-        <input
-          name="middle_name"
-          value={formData.middle_name}
-          onChange={handleChange}
-          placeholder="Middle name"
-          className="p-2 border rounded w-full text-black"
-        />
-        <input
-          name="last_name"
-          value={formData.last_name}
-          onChange={handleChange}
-          placeholder="Last name"
-          className="p-2 border rounded w-full text-black"
-        />
-        <input
-          type="date"
-          name="date_of_birth"
-          value={formData.date_of_birth}
-          onChange={handleChange}
-          className="p-2 border rounded w-full text-black"
-        />
+        <div>
+          <input
+            name="middle_name"
+            value={formData.middle_name}
+            onChange={handleChange}
+            placeholder="Middle name"
+            className="p-2 border rounded w-full text-black"
+          />
+        </div>
+
+        <div>
+          <input
+            name="last_name"
+            value={formData.last_name}
+            onChange={handleChange}
+            placeholder="Last name"
+            className={`p-2 border rounded w-full text-black ${errors.last_name ? inputErrorClasses : ''}`}
+          />
+          {errors.last_name && (
+            <p className={errorMessageClasses}>{errors.last_name}</p>
+          )}
+        </div>
+
+        <div>
+          <input
+            type="date"
+            name="date_of_birth"
+            value={formData.date_of_birth}
+            onChange={handleChange}
+            className={`p-2 border rounded w-full text-black ${errors.date_of_birth ? inputErrorClasses : ''}`}
+          />
+          {errors.date_of_birth && (
+            <p className={errorMessageClasses}>{errors.date_of_birth}</p>
+          )}
+        </div>
       </div>
 
       <div>
@@ -170,14 +259,19 @@ export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
           name="status"
           value={formData.status}
           onChange={handleChange}
-          className="p-2 border rounded w-full text-black"
+          className={`p-2 border rounded w-full text-black ${errors.status ? inputErrorClasses : ''}`}
         >
+          <option value="">Select Status</option>
           <option value="inquiry">Inquiry</option>
           <option value="onboarding">Onboarding</option>
           <option value="active">Active</option>
           <option value="churned">Churned</option>
         </select>
+        {errors.status && (
+          <p className={errorMessageClasses}>{errors.status}</p>
+        )}
       </div>
+
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h4 className="text-lg font-semibold text-gray-800">Addresses</h4>
@@ -204,72 +298,174 @@ export function PatientInfo({ patient, onSaved, onClose }: PatientInfoProps) {
             >
               ×
             </button>
-            <input
-              name="address_line1"
-              placeholder="Address Line 1"
-              value={addr.address_line1}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].address_line1 = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
-            <input
-              name="address_line2"
-              placeholder="Address Line 2"
-              value={addr.address_line2}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].address_line2 = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
-            <input
-              name="city"
-              placeholder="City"
-              value={addr.city}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].city = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
-            <input
-              name="state"
-              placeholder="State"
-              value={addr.state}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].state = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
-            <input
-              name="postal_code"
-              placeholder="Postal Code"
-              value={addr.postal_code}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].postal_code = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
-            <input
-              name="country"
-              placeholder="Country"
-              value={addr.country}
-              onChange={e => {
-                const updated = [...formData.addresses];
-                updated[index].country = e.target.value;
-                setFormData({ ...formData, addresses: updated });
-              }}
-              className="p-2 border rounded w-full text-black"
-            />
+            <div>
+              <input
+                name="address_line1"
+                placeholder="Address Line 1"
+                value={addr.address_line1}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].address_line1 = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                  // Clear error when field is modified
+                  if (errors.addresses?.[index]?.address_line1) {
+                    setErrors(prev => ({
+                      ...prev,
+                      addresses: {
+                        ...prev.addresses,
+                        [index]: {
+                          ...prev.addresses?.[index],
+                          address_line1: undefined,
+                        },
+                      },
+                    }));
+                  }
+                }}
+                className={`p-2 border rounded w-full text-black ${errors.addresses?.[index]?.address_line1 ? inputErrorClasses : ''}`}
+              />
+              {errors.addresses?.[index]?.address_line1 && (
+                <p className={errorMessageClasses}>
+                  {errors.addresses[index].address_line1}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                name="address_line2"
+                placeholder="Address Line 2"
+                value={addr.address_line2}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].address_line2 = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                }}
+                className="p-2 border rounded w-full text-black"
+              />
+            </div>
+            <div>
+              <input
+                name="city"
+                placeholder="City"
+                value={addr.city}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].city = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                  // Clear error when field is modified
+                  if (errors.addresses?.[index]?.city) {
+                    setErrors(prev => ({
+                      ...prev,
+                      addresses: {
+                        ...prev.addresses,
+                        [index]: {
+                          ...prev.addresses?.[index],
+                          city: undefined,
+                        },
+                      },
+                    }));
+                  }
+                }}
+                className={`p-2 border rounded w-full text-black ${errors.addresses?.[index]?.city ? inputErrorClasses : ''}`}
+              />
+              {errors.addresses?.[index]?.city && (
+                <p className={errorMessageClasses}>
+                  {errors.addresses[index].city}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                name="state"
+                placeholder="State"
+                value={addr.state}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].state = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                  // Clear error when field is modified
+                  if (errors.addresses?.[index]?.state) {
+                    setErrors(prev => ({
+                      ...prev,
+                      addresses: {
+                        ...prev.addresses,
+                        [index]: {
+                          ...prev.addresses?.[index],
+                          state: undefined,
+                        },
+                      },
+                    }));
+                  }
+                }}
+                className={`p-2 border rounded w-full text-black ${errors.addresses?.[index]?.state ? inputErrorClasses : ''}`}
+              />
+              {errors.addresses?.[index]?.state && (
+                <p className={errorMessageClasses}>
+                  {errors.addresses[index].state}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                name="postal_code"
+                placeholder="Postal Code"
+                value={addr.postal_code}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].postal_code = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                  // Clear error when field is modified
+                  if (errors.addresses?.[index]?.postal_code) {
+                    setErrors(prev => ({
+                      ...prev,
+                      addresses: {
+                        ...prev.addresses,
+                        [index]: {
+                          ...prev.addresses?.[index],
+                          postal_code: undefined,
+                        },
+                      },
+                    }));
+                  }
+                }}
+                className={`p-2 border rounded w-full text-black ${errors.addresses?.[index]?.postal_code ? inputErrorClasses : ''}`}
+              />
+              {errors.addresses?.[index]?.postal_code && (
+                <p className={errorMessageClasses}>
+                  {errors.addresses[index].postal_code}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                name="country"
+                placeholder="Country"
+                value={addr.country}
+                onChange={e => {
+                  const updated = [...formData.addresses];
+                  updated[index].country = e.target.value;
+                  setFormData({ ...formData, addresses: updated });
+                  // Clear error when field is modified
+                  if (errors.addresses?.[index]?.country) {
+                    setErrors(prev => ({
+                      ...prev,
+                      addresses: {
+                        ...prev.addresses,
+                        [index]: {
+                          ...prev.addresses?.[index],
+                          country: undefined,
+                        },
+                      },
+                    }));
+                  }
+                }}
+                className={`p-2 border rounded w-full text-black ${errors.addresses?.[index]?.country ? inputErrorClasses : ''}`}
+              />
+              {errors.addresses?.[index]?.country && (
+                <p className={errorMessageClasses}>
+                  {errors.addresses[index].country}
+                </p>
+              )}
+            </div>
           </div>
         ))}
       </div>
