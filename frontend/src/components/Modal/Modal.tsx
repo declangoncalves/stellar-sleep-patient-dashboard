@@ -15,19 +15,19 @@ export function Modal({ children, onClose }: ModalProps) {
   const [isExiting, setIsExiting] = useState(false);
   const el = document.createElement('div');
 
-  useEffect(() => {
-    document.body.append(el);
-    return () => {
-      document.body.removeChild(el);
-    };
-  }, [el]);
-
   const handleClose = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => {
       onClose();
     }, 200); // Match the exit animation duration
   }, [onClose]);
+
+  useEffect(() => {
+    document.body.appendChild(el);
+    return () => {
+      document.body.removeChild(el);
+    };
+  }, [el]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

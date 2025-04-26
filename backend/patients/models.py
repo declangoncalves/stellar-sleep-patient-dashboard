@@ -19,6 +19,8 @@ class Patient(models.Model):
         default='inquiry'
     )
 
+    ready_to_discharge = models.BooleanField(default=False)
+
     # JSON field for extra configurable fields per patient (flexible key-value data)
     extra_data = models.JSONField(default=dict, blank=True)
 
@@ -40,3 +42,18 @@ class Address(models.Model):
 
     def __str__(self):
         return f"{self.address_line1}, {self.city}"
+
+
+class ISIScore(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='isi_scores')
+    score = models.IntegerField()
+    date = models.DateField()
+
+    class Meta:
+        ordering = ['-date']  # Most recent scores first
+        indexes = [
+            models.Index(fields=['patient', 'date']),
+        ]
+
+    def __str__(self):
+        return f"ISI Score: {self.score} for {self.patient} on {self.date}"

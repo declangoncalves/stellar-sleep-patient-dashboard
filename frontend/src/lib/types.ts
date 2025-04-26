@@ -8,6 +8,12 @@ export interface Address {
   country: string;
 }
 
+export interface ISIScore {
+  id: number;
+  score?: number;
+  date: string;
+}
+
 export interface Patient {
   id: number;
   first_name: string;
@@ -19,4 +25,6 @@ export interface Patient {
   addresses: Address[];
   created_at: string;
   updated_at: string;
+  ready_to_discharge: boolean;
+  isi_scores: ISIScore[];
 }

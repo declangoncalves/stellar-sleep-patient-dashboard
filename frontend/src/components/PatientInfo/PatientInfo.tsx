@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Patient, Address } from '@/lib/types';
+import { Patient, Address, ISIScore } from '@/lib/types';
 import axios from 'axios';
 import clsx from 'clsx';
 import { Button } from '@/components/Button/Button';
@@ -13,8 +13,9 @@ interface PatientInfoProps {
   isCreateMode?: boolean;
 }
 
-interface FormData extends Omit<Patient, 'addresses'> {
+interface FormData extends Omit<Patient, 'addresses' | 'isi_scores'> {
   addresses: (Address | (Omit<Address, 'id'> & { id: number | null }))[];
+  isi_scores: (ISIScore | (Omit<ISIScore, 'id'> & { id: null }))[];
 }
 
 interface AddressError {
@@ -31,6 +32,7 @@ interface ValidationErrors {
   date_of_birth?: string;
   status?: string;
   addresses?: { [key: number]: AddressError };
+  isi_scores?: { [key: number]: string };
 }
 
 export function PatientInfo({
@@ -46,10 +48,14 @@ export function PatientInfo({
     last_name: patient.last_name || '',
     date_of_birth: patient.date_of_birth || '',
     status: patient.status || 'inquiry',
+    ready_to_discharge: patient.ready_to_discharge || false,
+    last_visit: patient.last_visit || null,
     addresses: patient.addresses || [],
+    isi_scores: patient.isi_scores || [],
     created_at: patient.created_at || new Date().toISOString(),
     updated_at: patient.updated_at || new Date().toISOString(),
   });
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>(
     'idle',
@@ -76,6 +82,29 @@ export function PatientInfo({
     if (!formData.status) {
       newErrors.status = 'Status is required';
       isValid = false;
+    }
+
+    // Validate ISI scores
+    const isiScoreErrors: { [key: number]: string } = {};
+    formData.isi_scores.forEach((score, index) => {
+      if (
+        score.score === undefined ||
+        score.score === null ||
+        isNaN(score.score)
+      ) {
+        isiScoreErrors[index] = 'Score is required';
+        isValid = false;
+      } else if (score.score < 0 || score.score > 28) {
+        isiScoreErrors[index] = 'Score must be between 0 and 28';
+        isValid = false;
+      }
+      if (!score.date) {
+        isiScoreErrors[index] = 'Date is required';
+        isValid = false;
+      }
+    });
+    if (Object.keys(isiScoreErrors).length > 0) {
+      newErrors.isi_scores = isiScoreErrors;
     }
 
     // Validate addresses
@@ -145,17 +174,10 @@ export function PatientInfo({
             middle_name: formData.middle_name,
             date_of_birth: formData.date_of_birth,
             status: formData.status,
+            ready_to_discharge: formData.ready_to_discharge,
           },
         );
         updatedPatient = response.data;
-
-        // Create addresses for new patient
-        for (const address of formData.addresses) {
-          await axios.post('http://127.0.0.1:8000/api/addresses/', {
-            ...address,
-            patient: updatedPatient.id,
-          });
-        }
       } else {
         // Update existing patient
         await axios.put(`http://127.0.0.1:8000/api/patients/${formData.id}/`, {
@@ -164,6 +186,7 @@ export function PatientInfo({
           middle_name: formData.middle_name,
           date_of_birth: formData.date_of_birth,
           status: formData.status,
+          ready_to_discharge: formData.ready_to_discharge,
         });
 
         // Then handle addresses
@@ -185,11 +208,27 @@ export function PatientInfo({
           }
         }
 
+        // Handle ISI scores
+        for (const score of formData.isi_scores) {
+          if (score.id === null) {
+            // New score
+            await axios.post('http://127.0.0.1:8000/api/isi-scores/', {
+              patient: formData.id,
+              score: score.score,
+              date: score.date,
+            });
+          }
+        }
+
         updatedPatient = {
           ...formData,
           addresses: formData.addresses.map(addr => ({
             ...addr,
             id: addr.id || 0,
+          })),
+          isi_scores: formData.isi_scores.map(score => ({
+            ...score,
+            id: score.id || 0,
           })),
         };
       }
@@ -220,6 +259,13 @@ export function PatientInfo({
     });
   };
 
+  const handleDeleteISIScore = (scoreId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      isi_scores: prev.isi_scores.filter(score => score.id !== scoreId),
+    }));
+  };
+
   const statusClasses = clsx(
     'inline-block px-3 py-1 text-sm font-semibold rounded-full capitalize',
     {
@@ -244,6 +290,7 @@ export function PatientInfo({
           ×
         </Button>
       </div>
+
       <form
         id="patient-form"
         name="patient-form"
@@ -304,8 +351,8 @@ export function PatientInfo({
               name="last_name"
               value={formData.last_name}
               onChange={handleChange}
-              placeholder="Last name"
               className={`p-2 border rounded w-full text-black ${errors.last_name ? inputErrorClasses : ''}`}
+              placeholder="Last name"
               autoComplete="family-name"
             />
             {errors.last_name && (
@@ -322,12 +369,11 @@ export function PatientInfo({
             </label>
             <input
               id="date_of_birth"
-              type="date"
               name="date_of_birth"
+              type="date"
               value={formData.date_of_birth}
               onChange={handleChange}
               className={`p-2 border rounded w-full text-black ${errors.date_of_birth ? inputErrorClasses : ''}`}
-              autoComplete="bday"
             />
             {errors.date_of_birth && (
               <p className={errorMessageClasses}>{errors.date_of_birth}</p>
@@ -363,7 +409,186 @@ export function PatientInfo({
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="flex items-center">
+          <input
+            id="ready_to_discharge"
+            name="ready_to_discharge"
+            type="checkbox"
+            checked={formData.ready_to_discharge}
+            onChange={e =>
+              setFormData(prev => ({
+                ...prev,
+                ready_to_discharge: e.target.checked,
+              }))
+            }
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label
+            htmlFor="ready_to_discharge"
+            className="ml-2 block text-sm font-medium text-gray-700"
+          >
+            Ready to Discharge
+          </label>
+        </div>
+
+        <div className="space-y-4 mt-6">
+          <h3 className="text-lg font-medium text-gray-900">ISI Scores</h3>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Score
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {formData.isi_scores?.map((score, index) => (
+                  <tr key={score.id || `new-${index}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="date"
+                        value={score.date}
+                        onChange={e => {
+                          const updatedScores = [...formData.isi_scores];
+                          updatedScores[index] = {
+                            ...updatedScores[index],
+                            date: e.target.value,
+                          };
+                          setFormData(prev => ({
+                            ...prev,
+                            isi_scores: updatedScores,
+                          }));
+                          // Clear error when field is modified
+                          if (errors.isi_scores?.[index]) {
+                            const newErrors = { ...errors };
+                            delete newErrors.isi_scores?.[index];
+                            if (
+                              Object.keys(newErrors.isi_scores || {}).length ===
+                              0
+                            ) {
+                              delete newErrors.isi_scores;
+                            }
+                            setErrors(newErrors);
+                          }
+                        }}
+                        className={`mt-1 block w-full text-black rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2 ${
+                          errors.isi_scores?.[index]
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }`}
+                      />
+                      {errors.isi_scores?.[index] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.isi_scores[index]}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="number"
+                        min="0"
+                        max="28"
+                        value={score.score ?? ''}
+                        onChange={e => {
+                          const updatedScores = [...formData.isi_scores];
+                          const newScore =
+                            e.target.value === ''
+                              ? null
+                              : parseInt(e.target.value);
+                          updatedScores[index] = {
+                            ...updatedScores[index],
+                            score: newScore === null ? undefined : newScore,
+                          };
+                          setFormData(prev => ({
+                            ...prev,
+                            isi_scores: updatedScores,
+                          }));
+                          // Clear error when field is modified
+                          if (errors.isi_scores?.[index]) {
+                            const newErrors = { ...errors };
+                            delete newErrors.isi_scores?.[index];
+                            if (
+                              Object.keys(newErrors.isi_scores || {}).length ===
+                              0
+                            ) {
+                              delete newErrors.isi_scores;
+                            }
+                            setErrors(newErrors);
+                          }
+                        }}
+                        className={`mt-1 block w-full text-black rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm p-2 ${
+                          errors.isi_scores?.[index]
+                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                            : ''
+                        }`}
+                      />
+                      {errors.isi_scores?.[index] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors.isi_scores[index]}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button
+                        onClick={() => {
+                          if (score.id) {
+                            handleDeleteISIScore(score.id);
+                          } else {
+                            const updatedScores = formData.isi_scores.filter(
+                              (_, i) => i !== index,
+                            );
+                            setFormData(prev => ({
+                              ...prev,
+                              isi_scores: updatedScores,
+                            }));
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={3} className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          isi_scores: [
+                            ...prev.isi_scores,
+                            {
+                              id: null,
+                              score: 0,
+                              date: new Date().toISOString().split('T')[0],
+                              created_at: new Date().toISOString(),
+                              updated_at: new Date().toISOString(),
+                            },
+                          ],
+                        }));
+                      }}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Add New Score
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="space-y-4 mt-6">
           <div className="flex justify-between items-center">
             <h4 className="text-lg font-semibold text-gray-800">Addresses</h4>
             <Button onClick={handleAddAddress} variant="primary" size="sm">
@@ -602,7 +827,7 @@ export function PatientInfo({
           ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 mt-6">
           <Button
             type="submit"
             disabled={isSaving}

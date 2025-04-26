@@ -196,8 +196,8 @@ export default function PatientsPage() {
       <Navbar className="fixed top-0 left-0 right-0 z-10" />
       <main className="flex-1 flex flex-col mt-[calc(var(--navbar-height)+1rem)] px-16 py-2 pt-8 overflow-hidden">
         <div className="flex justify-between items-center mb-12 pb-4 border-b border-gray-200">
-          <div className="flex items-center gap-6">
-            <h1 className="text-4xl text-black">Patients</h1>
+          <h1 className="text-4xl text-black">Patients</h1>
+          <div className="flex items-center gap-4">
             <div className="w-[28rem]">
               <Searchbar
                 value={searchQuery}
@@ -205,8 +205,6 @@ export default function PatientsPage() {
                 placeholder="Search patients by name..."
               />
             </div>
-          </div>
-          <div className="flex items-center gap-4">
             <div className="relative">
               <Button
                 variant="outline"

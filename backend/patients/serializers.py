@@ -1,14 +1,20 @@
 from rest_framework import serializers
-from .models import Patient, Address
+from .models import Patient, Address, ISIScore
 
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = ["id", "patient", "address_line1", "address_line2", "city", "state", "postal_code", "country"]
 
+class ISIScoreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ISIScore
+        fields = ["id", "patient", "score", "date"]
+
 class PatientSerializer(serializers.ModelSerializer):
     # nest addresses on the read side
     addresses = AddressSerializer(many=True, read_only=True)
+    isi_scores = ISIScoreSerializer(many=True, read_only=True)
 
     class Meta:
         model = Patient
@@ -19,5 +25,7 @@ class PatientSerializer(serializers.ModelSerializer):
             "extra_data",
             "addresses",
             "created_at", "updated_at",
+            "ready_to_discharge",
+            "isi_scores",
         ]
         read_only_fields = ["created_at", "updated_at"]

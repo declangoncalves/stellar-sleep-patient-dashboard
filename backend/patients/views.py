@@ -1,7 +1,7 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter
-from .models import Patient, Address
-from .serializers import PatientSerializer, AddressSerializer
+from .models import Patient, Address, ISIScore
+from .serializers import PatientSerializer, AddressSerializer, ISIScoreSerializer
 
 class PatientFilter(FilterSet):
     city = CharFilter(field_name='addresses__city', lookup_expr='icontains')
@@ -23,3 +23,11 @@ class PatientViewSet(viewsets.ModelViewSet):
 class AddressViewSet(viewsets.ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
+
+class ISIScoreViewSet(viewsets.ModelViewSet):
+    queryset = ISIScore.objects.all()
+    serializer_class = ISIScoreSerializer
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['patient', 'date']
+    ordering_fields = ['date', 'score']
+    ordering = ['-date']  # Most recent scores first
