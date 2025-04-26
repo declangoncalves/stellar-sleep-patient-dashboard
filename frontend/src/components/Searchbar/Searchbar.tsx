@@ -1,21 +1,23 @@
-// frontend/src/components/SearchBar.tsx
+// frontend/src/components/Searchbar/Searchbar.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 interface SearchbarProps {
   placeholder?: string;
   onSearch?: (query: string) => void;
   onChange?: (query: string) => void;
+  value?: string;
 }
 
 export function Searchbar({
   placeholder = 'Search appointment, patient or etc…',
   onSearch,
   onChange,
+  value = '',
 }: SearchbarProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(value);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,13 +30,23 @@ export function Searchbar({
     if (onChange) onChange(newQuery.trim());
   }
 
+  // Update internal state when value prop changes
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-center h-16 w-full bg-nonerounded-lg overflow-hidden"
+      className="flex items-center h-12 w-full rounded-lg overflow-hidden bg-white border border-gray-200"
+      role="search"
+      aria-label="Search form"
     >
       <div className="flex-shrink-0 pl-3">
-        <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
+        <MagnifyingGlassIcon
+          className="w-5 h-5 text-gray-400"
+          aria-hidden="true"
+        />
       </div>
 
       <input
@@ -43,14 +55,8 @@ export function Searchbar({
         onChange={handleChange}
         placeholder={placeholder}
         className="flex-1 px-3 py-2 text-gray-700 placeholder-gray-400 focus:outline-none"
+        aria-label="Search input"
       />
-
-      <button
-        type="submit"
-        className="text-blue-400 border-blue-200 border-2 rounded-full hover:bg-blue-100 px-4 py-2"
-      >
-        Search
-      </button>
     </form>
   );
 }

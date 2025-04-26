@@ -3,7 +3,7 @@
 
 import { ReactNode } from 'react';
 // import Link from "next/link";
-import { Sidebar } from './Sidebar/Sidebar';
+// import { Sidebar } from './Sidebar/Sidebar';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -14,15 +14,10 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar */}
-      <aside className="flex-shrink-0 bg-white border-r transition-all w-32">
-        <Sidebar collapsed={false} />
-      </aside>
-
       {/* Main area */}
       <div className="flex-1 flex flex-col">
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6 bg-white">{children}</main>
+        <main className="flex-1 overflow-auto bg-white">{children}</main>
       </div>
     </div>
   );

@@ -48,13 +48,13 @@ export function Sidebar({ collapsed }: SidebarProps) {
         />
       </div>
       <ul>
-        {links.map(({ href, Icon }) => {
+        {links.map(({ href, Icon, label }) => {
           const isActive =
             pathname === href || pathname?.startsWith(href + '/');
           return (
             <li
               key={href}
-              className={`${isActive ? 'bg-blue-100 border-l-4 border-blue-500' : ''} group flex justify-center w-full h-20 hover:bg-blue-100`}
+              className={`${isActive ? 'bg-blue-100 border-l-4 border-blue-500' : ''} group flex justify-left w-full h-20 hover:bg-blue-100`}
             >
               <Link
                 href={href}
@@ -64,10 +64,14 @@ export function Sidebar({ collapsed }: SidebarProps) {
                 ${collapsed ? 'justify-center' : ''}
               `}
               >
-                <Icon className="w-7 h-7 flex-shrink-0 text-gray-700" />
+                <Icon className="w-6 h-6 flex-shrink-0 text-black" />
 
                 {/* Show label only when not collapsed */}
-                {/* {!collapsed && <span>{label}</span>} */}
+                {!collapsed && (
+                  <span className={`${styles.sidebarLabel} text-black`}>
+                    {label}
+                  </span>
+                )}
               </Link>
             </li>
           );

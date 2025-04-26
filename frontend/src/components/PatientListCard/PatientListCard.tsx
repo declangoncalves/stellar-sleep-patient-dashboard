@@ -35,7 +35,7 @@ export function PatientListCard({ patient }: PatientListCardProps) {
   );
 
   return (
-    <div className="block p-4 hover:bg-blue-50 rounded-lg shadow hover:shadow-md transition">
+    <div className="block p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ease-in-out hover:bg-gray-50/50 cursor-pointer">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-medium text-gray-800">{fullName}</h3>
         <span className={statusClasses}>{status}</span>

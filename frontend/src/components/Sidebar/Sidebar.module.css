@@ -3,5 +3,11 @@
 }
 
 .sidebar {
-  background: var(--secondary);
+  background: var(--secondary2);
+}
+
+.sidebarLabel {
+  /* font-size: 14px;
+  font-weight: 500; */
+  font-family: 'SuisseIntlMono';
 }

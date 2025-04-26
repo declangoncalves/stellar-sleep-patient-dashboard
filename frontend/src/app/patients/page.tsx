@@ -1,13 +1,15 @@
 // frontend/app/page.tsx (Next 13+ with app router)
 
 'use client';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import type { Patient } from '@/lib/types';
-import { PatientListCard } from '@/components/PatientListCard/PatientListCard';
 import { Modal } from '@/components/Modal/Modal';
 import { PatientInfo } from '@/components/PatientInfo/PatientInfo';
 import { Searchbar } from '@/components/Searchbar/Searchbar';
+import { PatientTable } from '@/components/PatientTable/PatientTable';
+import { Navbar } from '@/components/Navbar/Navbar';
+import { Button } from '@/components/Button/Button';
 
 interface PaginatedResponse {
   count: number;
@@ -19,26 +21,36 @@ interface PaginatedResponse {
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isCreateMode, setIsCreateMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+  const [debouncedCityFilter, setDebouncedCityFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [debouncedStateFilter, setDebouncedStateFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const observer = useRef<IntersectionObserver | null>(null);
-  const lastPatientRef = useCallback(
-    (node: HTMLLIElement | null) => {
-      if (isLoadingMore) return;
-      if (observer.current) observer.current.disconnect();
-      observer.current = new IntersectionObserver(entries => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadMorePatients();
-        }
-      });
-      if (node) observer.current.observe(node);
-    },
-    [isLoadingMore, hasMore],
-  );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const filtersRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside of filters panel
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        filtersRef.current &&
+        !filtersRef.current.contains(event.target as Node)
+      ) {
+        setIsFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Debounce search query
   useEffect(() => {
@@ -49,17 +61,35 @@ export default function PatientsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch initial data when filters or search change
+  // Debounce city filter
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const timer = setTimeout(() => {
+      setDebouncedCityFilter(cityFilter);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [cityFilter]);
+
+  // Debounce state filter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStateFilter(stateFilter);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [stateFilter]);
+
+  // Fetch data when filters, search, or page changes
+  useEffect(() => {
+    const fetchData = async () => {
       setIsLoading(true);
-      setPatients([]); // Clear existing patients before new fetch
-      setHasMore(true);
 
       try {
         const params = new URLSearchParams({
-          page: '1',
+          page: currentPage.toString(),
           ...(statusFilter && { status: statusFilter }),
+          ...(debouncedCityFilter && { city: debouncedCityFilter }),
+          ...(debouncedStateFilter && { state: debouncedStateFilter }),
           ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
         });
 
@@ -68,7 +98,7 @@ export default function PatientsPage() {
         );
 
         setPatients(response.data.results);
-        setHasMore(response.data.next !== null);
+        setTotalPages(Math.ceil(response.data.count / 10));
       } catch (err) {
         console.error('Error fetching patients:', err);
       } finally {
@@ -76,150 +106,206 @@ export default function PatientsPage() {
       }
     };
 
-    fetchInitialData();
-  }, [statusFilter, debouncedSearchQuery]);
+    fetchData();
+  }, [
+    statusFilter,
+    debouncedCityFilter,
+    debouncedStateFilter,
+    debouncedSearchQuery,
+    currentPage,
+  ]);
 
-  const loadMorePatients = async () => {
-    if (isLoadingMore || !hasMore) return;
-
-    setIsLoadingMore(true);
-    try {
-      const nextPage = Math.ceil(patients.length / 10) + 1;
-      const params = new URLSearchParams({
-        page: nextPage.toString(),
-        ...(statusFilter && { status: statusFilter }),
-        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
-      });
-
-      const response = await axios.get<PaginatedResponse>(
-        `http://127.0.0.1:8000/api/patients/?${params}`,
-      );
-
-      setPatients(prev => [...prev, ...response.data.results]);
-      setHasMore(response.data.next !== null);
-    } catch (err) {
-      console.error('Error loading more patients:', err);
-    } finally {
-      setIsLoadingMore(false);
-    }
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatusFilter(e.target.value);
+  const handleCityChange = (value: string) => {
+    setCityFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleStateChange = (value: string) => {
+    setStateFilter(value);
+    setCurrentPage(1);
   };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
+    setCurrentPage(1); // Reset to first page when search changes
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleAddPatient = () => {
+    setIsCreateMode(true);
+    setSelectedPatient({
+      id: 0,
+      first_name: '',
+      last_name: '',
+      date_of_birth: '',
+      status: 'inquiry',
+      addresses: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  };
+
+  const handlePatientSaved = (updatedPatient: Patient) => {
+    if (isCreateMode) {
+      setPatients([updatedPatient, ...patients]);
+    } else {
+      setPatients(
+        patients.map(p => (p.id === updatedPatient.id ? updatedPatient : p)),
+      );
+    }
+    setSelectedPatient(null);
+    setIsCreateMode(false);
   };
 
   return (
-    <main className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl text-black font-bold">Patients</h1>
-        <div className="w-1/3">
-          <Searchbar
-            placeholder="Search patients by name..."
-            onChange={handleSearchChange}
-          />
-        </div>
-      </div>
-
-      {/* Filter Controls */}
-      <div className="mb-6 p-4 bg-white rounded-lg shadow">
-        <div>
-          <label
-            htmlFor="status"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Status
-          </label>
-          <select
-            id="status"
-            value={statusFilter}
-            onChange={handleStatusChange}
-            className="w-full p-2 border rounded-md"
-          >
-            <option value="">All Statuses</option>
-            <option value="inquiry">Inquiry</option>
-            <option value="onboarding">Onboarding</option>
-            <option value="active">Active</option>
-            <option value="churned">Churned</option>
-          </select>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>
-      ) : (
-        <>
-          {patients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-              <svg
-                className="w-16 h-16 mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <p className="text-xl font-medium">No patients found</p>
-              <p className="text-sm mt-2">
-                {debouncedSearchQuery
-                  ? 'Try adjusting your search or filters'
-                  : 'Try adjusting your filters'}
-              </p>
+    <div className="flex flex-col h-screen overflow-hidden">
+      <Navbar className="fixed top-0 left-0 right-0 z-10" />
+      <main className="flex-1 flex flex-col mt-[calc(var(--navbar-height)+1rem)] px-16 py-2 pt-8 overflow-hidden">
+        <div className="flex justify-between items-center mb-12 pb-4 border-b border-gray-200">
+          <h1 className="text-4xl text-black">Patients</h1>
+          <div className="flex items-center gap-4">
+            <div className="w-[28rem]">
+              <Searchbar
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search patients by name..."
+              />
             </div>
-          ) : (
-            <>
-              <ul className="space-y-2">
-                {patients.map((patient, index) => (
-                  <li
-                    key={`${patient.id}-${index}`}
-                    ref={index === patients.length - 1 ? lastPatientRef : null}
-                    className="text-black"
-                    onClick={() => setSelectedPatient(patient)}
-                  >
-                    <PatientListCard patient={patient} />
-                  </li>
-                ))}
-              </ul>
-
-              {isLoadingMore && (
-                <div className="flex justify-center items-center my-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+              >
+                Filters
+              </Button>
+              {isFiltersOpen && (
+                <div
+                  ref={filtersRef}
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-lg border border-gray-200 shadow-lg z-50"
+                >
+                  <div className="p-4 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={statusFilter}
+                        onChange={e => handleStatusChange(e.target.value)}
+                        className="w-full p-2 border rounded text-black"
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="inquiry">Inquiry</option>
+                        <option value="onboarding">Onboarding</option>
+                        <option value="active">Active</option>
+                        <option value="churned">Churned</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={cityFilter}
+                        onChange={e => handleCityChange(e.target.value)}
+                        placeholder="Filter by city"
+                        className="w-full p-2 border rounded text-black"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={stateFilter}
+                        onChange={e => handleStateChange(e.target.value)}
+                        placeholder="Filter by state"
+                        className="w-full p-2 border rounded text-black"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
-            </>
-          )}
-        </>
-      )}
+            </div>
+            <Button variant="primary" onClick={handleAddPatient}>
+              Add Patient
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex bg-white rounded-lg overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-auto">
+              <PatientTable
+                patients={patients}
+                onPatientClick={setSelectedPatient}
+                isLoading={isLoading}
+              />
+            </div>
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-center py-6 border-t border-gray-200">
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || patients.length === 0}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    page => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? 'primary' : 'outline'}
+                        onClick={() => handlePageChange(page)}
+                        disabled={patients.length === 0}
+                      >
+                        {page}
+                      </Button>
+                    ),
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || patients.length === 0}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
 
       {selectedPatient && (
-        <Modal onClose={() => setSelectedPatient(null)}>
+        <Modal
+          onClose={() => {
+            setSelectedPatient(null);
+            setIsCreateMode(false);
+          }}
+        >
           <PatientInfo
             patient={selectedPatient}
-            onSaved={updated => {
-              console.log('updated', updated);
-              /* update your state */
+            onSaved={handlePatientSaved}
+            onClose={() => {
+              setSelectedPatient(null);
+              setIsCreateMode(false);
             }}
-            onClose={() => setSelectedPatient(null)}
+            isCreateMode={isCreateMode}
           />
-          <button
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            onClick={() => setSelectedPatient(null)}
-          >
-            Close
-          </button>
         </Modal>
       )}
-    </main>
+    </div>
   );
 }
