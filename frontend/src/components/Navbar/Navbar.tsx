@@ -41,7 +41,7 @@ export function Navbar({
       {...props}
     >
       <div className="h-full flex items-center justify-between px-16">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center space-x-8">
           <Image
             src="/logo-dark-1.svg"
             alt="Stellar Sleep"

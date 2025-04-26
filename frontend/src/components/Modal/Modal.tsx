@@ -1,7 +1,7 @@
 // frontend/src/components/Modal.tsx
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 import styles from './Modal.module.css';
@@ -22,20 +22,20 @@ export function Modal({ children, onClose }: ModalProps) {
     };
   }, [el]);
 
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose();
+    }, 200); // Match the exit animation duration
+  }, [onClose]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') handleClose();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      onClose();
-    }, 200); // Match the exit animation duration
-  };
+  }, [handleClose]);
 
   return createPortal(
     <div

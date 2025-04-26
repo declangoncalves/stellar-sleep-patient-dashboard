@@ -15,5 +15,8 @@ export interface Patient {
   last_name: string;
   date_of_birth: string;
   status: 'inquiry' | 'onboarding' | 'active' | 'churned';
+  last_visit: string | null;
   addresses: Address[];
+  created_at: string;
+  updated_at: string;
 }

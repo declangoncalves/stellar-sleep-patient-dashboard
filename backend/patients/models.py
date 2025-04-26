@@ -5,6 +5,7 @@ class Patient(models.Model):
     middle_name  = models.CharField(max_length=50, blank=True) # optional (no null, uses empty string if blank)
     last_name    = models.CharField(max_length=50)
     date_of_birth = models.DateField()
+    last_visit = models.DateField(null=True, blank=True)
 
     STATUS_CHOICES = [
         ('inquiry', 'Inquiry'),
@@ -20,6 +21,9 @@ class Patient(models.Model):
 
     # JSON field for extra configurable fields per patient (flexible key-value data)
     extra_data = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

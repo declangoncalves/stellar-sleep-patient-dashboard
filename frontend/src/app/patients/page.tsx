@@ -33,6 +33,8 @@ export default function PatientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const filtersRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside of filters panel
@@ -91,6 +93,7 @@ export default function PatientsPage() {
           ...(debouncedCityFilter && { city: debouncedCityFilter }),
           ...(debouncedStateFilter && { state: debouncedStateFilter }),
           ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
+          ordering: `${sortDirection === 'desc' ? '-' : ''}${sortColumn}`,
         });
 
         const response = await axios.get<PaginatedResponse>(
@@ -113,6 +116,8 @@ export default function PatientsPage() {
     debouncedStateFilter,
     debouncedSearchQuery,
     currentPage,
+    sortColumn,
+    sortDirection,
   ]);
 
   const handleStatusChange = (value: string) => {
@@ -147,6 +152,7 @@ export default function PatientsPage() {
       last_name: '',
       date_of_birth: '',
       status: 'inquiry',
+      last_visit: null,
       addresses: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -165,13 +171,33 @@ export default function PatientsPage() {
     setIsCreateMode(false);
   };
 
+  const handleSort = (column: string) => {
+    // Map frontend column names to database field names
+    const fieldMap: Record<string, string> = {
+      name: 'last_name',
+      status: 'status',
+      location: 'addresses__city',
+      age: 'date_of_birth',
+      last_visit: 'last_visit',
+    };
+
+    const dbField = fieldMap[column];
+    if (sortColumn === dbField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(dbField);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Navbar className="fixed top-0 left-0 right-0 z-10" />
       <main className="flex-1 flex flex-col mt-[calc(var(--navbar-height)+1rem)] px-16 py-2 pt-8 overflow-hidden">
         <div className="flex justify-between items-center mb-12 pb-4 border-b border-gray-200">
-          <h1 className="text-4xl text-black">Patients</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <h1 className="text-4xl text-black">Patients</h1>
             <div className="w-[28rem]">
               <Searchbar
                 value={searchQuery}
@@ -179,6 +205,8 @@ export default function PatientsPage() {
                 placeholder="Search patients by name..."
               />
             </div>
+          </div>
+          <div className="flex items-center gap-4">
             <div className="relative">
               <Button
                 variant="outline"
@@ -249,6 +277,9 @@ export default function PatientsPage() {
                 patients={patients}
                 onPatientClick={setSelectedPatient}
                 isLoading={isLoading}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onSort={handleSort}
               />
             </div>
             {/* Pagination Controls */}
