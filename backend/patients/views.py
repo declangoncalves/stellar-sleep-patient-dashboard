@@ -1,5 +1,6 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter
+from django.db.models import Max, Subquery, OuterRef
 from .models import Patient, Address, ISIScore
 from .serializers import PatientSerializer, AddressSerializer, ISIScoreSerializer
 
@@ -17,8 +18,24 @@ class PatientViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ["first_name", "last_name"]
     filterset_class = PatientFilter
-    ordering_fields = ['last_name', 'first_name', 'status', 'date_of_birth', 'last_visit', 'addresses__city']
+    ordering_fields = [
+        'last_name', 'first_name', 'status', 'date_of_birth', 'last_visit',
+        'addresses__city', 'isi_scores__score'
+    ]
     ordering = ['last_name', 'first_name']  # default ordering
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # If sorting by ISI score, use the first score (which is already the latest)
+        ordering = self.request.query_params.get('ordering', '')
+        if ordering in ['isi_scores__score', '-isi_scores__score']:
+            # Since isi_scores are ordered by date descending,
+            # we can use the first score directly
+            queryset = queryset.order_by(ordering)
+
+        # Always use distinct to avoid duplicates from joins
+        return queryset.distinct()
 
 class AddressViewSet(viewsets.ModelViewSet):
     queryset = Address.objects.all()
@@ -30,4 +47,5 @@ class ISIScoreViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['patient', 'date']
     ordering_fields = ['date', 'score']
-    ordering = ['-date']  # Most recent scores first
+    # Order by date descending, then by id descending to ensure consistent ordering
+    ordering = ['-date', '-id']  # Most recent scores first, then by id for same dates

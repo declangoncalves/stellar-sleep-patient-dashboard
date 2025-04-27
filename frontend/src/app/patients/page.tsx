@@ -33,7 +33,7 @@ export default function PatientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState('name');
+  const [sortColumn, setSortColumn] = useState('last_name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const filtersRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +100,15 @@ export default function PatientsPage() {
           `http://127.0.0.1:8000/api/patients/?${params}`,
         );
 
-        setPatients(response.data.results);
+        // Deduplicate patients by ID, keeping the first occurrence
+        const uniquePatients = response.data.results.reduce((acc, patient) => {
+          if (!acc.some(p => p.id === patient.id)) {
+            acc.push(patient);
+          }
+          return acc;
+        }, [] as Patient[]);
+
+        setPatients(uniquePatients);
         setTotalPages(Math.ceil(response.data.count / 10));
       } catch (err) {
         console.error('Error fetching patients:', err);
@@ -135,6 +143,13 @@ export default function PatientsPage() {
     setCurrentPage(1);
   };
 
+  const handleClearAllFilters = () => {
+    setStatusFilter('');
+    setCityFilter('');
+    setStateFilter('');
+    setCurrentPage(1);
+  };
+
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
     setCurrentPage(1); // Reset to first page when search changes
@@ -146,14 +161,18 @@ export default function PatientsPage() {
 
   const handleAddPatient = () => {
     setIsCreateMode(true);
+    // Use a negative ID for new patients to ensure uniqueness
+    const tempId = -Date.now(); // This will be unique for each new patient
     setSelectedPatient({
-      id: 0,
+      id: tempId,
       first_name: '',
       last_name: '',
       date_of_birth: '',
       status: 'inquiry',
       last_visit: null,
       addresses: [],
+      isi_scores: [],
+      ready_to_discharge: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -161,7 +180,12 @@ export default function PatientsPage() {
 
   const handlePatientSaved = (updatedPatient: Patient) => {
     if (isCreateMode) {
-      setPatients([updatedPatient, ...patients]);
+      // Remove any temporary patient with the same ID if it exists
+      setPatients(prevPatients =>
+        prevPatients
+          .filter(p => p.id !== updatedPatient.id)
+          .concat(updatedPatient),
+      );
     } else {
       setPatients(
         patients.map(p => (p.id === updatedPatient.id ? updatedPatient : p)),
@@ -171,16 +195,17 @@ export default function PatientsPage() {
     setIsCreateMode(false);
   };
 
-  const handleSort = (column: string) => {
-    // Map frontend column names to database field names
-    const fieldMap: Record<string, string> = {
-      name: 'last_name',
-      status: 'status',
-      location: 'addresses__city',
-      age: 'date_of_birth',
-      last_visit: 'last_visit',
-    };
+  // Map frontend column names to backend field names
+  const fieldMap: Record<string, string> = {
+    name: 'last_name',
+    status: 'status',
+    location: 'addresses__city',
+    age: 'date_of_birth',
+    last_visit: 'last_visit',
+    isi_score: 'isi_scores__score',
+  };
 
+  const handleSort = (column: string) => {
     const dbField = fieldMap[column];
     if (sortColumn === dbField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -211,6 +236,15 @@ export default function PatientsPage() {
                 onClick={() => setIsFiltersOpen(!isFiltersOpen)}
               >
                 Filters
+                {(statusFilter || cityFilter || stateFilter) && (
+                  <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {[
+                      statusFilter ? 1 : 0,
+                      cityFilter ? 1 : 0,
+                      stateFilter ? 1 : 0,
+                    ].reduce((a, b) => a + b, 0)}
+                  </span>
+                )}
               </Button>
               {isFiltersOpen && (
                 <div
@@ -258,6 +292,15 @@ export default function PatientsPage() {
                         className="w-full p-2 border rounded text-black"
                       />
                     </div>
+                  </div>
+                  <div className="text-red-300 pb-4">
+                    <Button
+                      variant="ghost"
+                      onClick={handleClearAllFilters}
+                      className="w-full text-red-400 font-bold"
+                    >
+                      Clear All
+                    </Button>
                   </div>
                 </div>
               )}
@@ -319,6 +362,7 @@ export default function PatientsPage() {
 
       {selectedPatient && (
         <Modal
+          title="Patient Info"
           onClose={() => {
             setSelectedPatient(null);
             setIsCreateMode(false);

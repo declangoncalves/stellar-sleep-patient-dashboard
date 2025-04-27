@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { Patient } from '@/lib/types';
+import type { Patient, ISIScore } from '@/lib/types';
 import Image from 'next/image';
+import clsx from 'clsx';
 
+// Types
 interface PatientTableProps {
   patients: Patient[];
   onPatientClick: (patient: Patient) => void;
@@ -13,6 +14,96 @@ interface PatientTableProps {
   onSort: (column: string) => void;
 }
 
+type ColumnConfig = {
+  key: string;
+  header: string;
+  width: string;
+  sortable?: boolean;
+  render: (patient: Patient) => React.ReactNode;
+};
+
+// Utility functions
+const getPatientName = (patient: Patient) => {
+  const middleInitial = patient.middle_name
+    ? ` ${patient.middle_name.charAt(0)}.`
+    : '';
+  return `${patient.first_name}${middleInitial} ${patient.last_name}`;
+};
+
+const getPrimaryAddress = (patient: Patient) => patient.addresses?.[0] || null;
+
+const calculateAge = (dateOfBirth: string) => {
+  const birthDate = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+
+  return age;
+};
+
+const getLatestISIScore = (scores: ISIScore[]) => {
+  if (!scores || scores.length === 0) return null;
+  return scores[0]; // First score is already the most recent
+};
+
+// Components
+const SortIcon = ({
+  column,
+  sortColumn,
+  sortDirection,
+}: {
+  column: string;
+  sortColumn: string;
+  sortDirection: 'asc' | 'desc';
+}) => {
+  const reverseFieldMap: Record<string, string> = {
+    last_name: 'name',
+    status: 'status',
+    addresses__city: 'location',
+    date_of_birth: 'age',
+    last_visit: 'last_visit',
+    isi_scores__score: 'isi_score',
+  };
+
+  const frontendField = reverseFieldMap[sortColumn];
+  if (column !== frontendField) return null;
+  return <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+};
+
+const StatusBadge = ({ status }: { status: Patient['status'] }) => {
+  const statusClasses = clsx('px-2 py-1 rounded-full text-xs font-medium', {
+    'bg-green-100 text-green-800': status === 'active',
+    'bg-blue-100 text-blue-800': status === 'inquiry',
+    'bg-yellow-100 text-yellow-800': status === 'onboarding',
+    'bg-red-100 text-red-800': status === 'churned',
+  });
+
+  return (
+    <span className={statusClasses}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+};
+
+const PatientAvatar = ({ name }: { name: string }) => (
+  <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-300">
+    <Image
+      src="/icons/stellar-sleep.png"
+      alt={name}
+      width={48}
+      height={48}
+      className="w-full h-full object-cover"
+    />
+  </div>
+);
+
 export function PatientTable({
   patients,
   onPatientClick,
@@ -21,167 +112,165 @@ export function PatientTable({
   sortDirection,
   onSort,
 }: PatientTableProps) {
-  const tableRef = useRef<HTMLTableElement>(null);
-  const [rowHeight, setRowHeight] = useState<number>(0);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      const tableHeight = tableRef.current.clientHeight;
-      const calculatedRowHeight = tableHeight / 11; // Divide by 11 for slightly smaller rows
-      setRowHeight(calculatedRowHeight);
-    }
-  }, []);
-
-  const getPatientName = (patient: Patient) => {
-    const middleInitial = patient.middle_name
-      ? ` ${patient.middle_name.charAt(0)}.`
-      : '';
-    return `${patient.first_name}${middleInitial} ${patient.last_name}`;
-  };
-
-  const getPrimaryAddress = (patient: Patient) => {
-    return patient.addresses?.[0] || null;
-  };
-
-  const calculateAge = (dateOfBirth: string) => {
-    const birthDate = new Date(dateOfBirth);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
-    }
-
-    return age;
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
-    // Map frontend column names to database field names
-    const fieldMap: Record<string, string> = {
-      name: 'last_name',
-      status: 'status',
-      location: 'addresses__city',
-      age: 'date_of_birth',
-      last_visit: 'last_visit',
-    };
-
-    const dbField = fieldMap[column];
-    if (sortColumn !== dbField) return null;
-    return <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>;
-  };
+  const columns: ColumnConfig[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      width: '2fr',
+      sortable: true,
+      render: patient => (
+        <div className="flex items-center gap-3">
+          <PatientAvatar name={getPatientName(patient)} />
+          <span className="font-medium truncate">
+            {getPatientName(patient)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'age',
+      header: 'Age',
+      width: '1fr',
+      sortable: true,
+      render: patient => (
+        <span>{calculateAge(patient.date_of_birth)} years</span>
+      ),
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      width: '1fr',
+      sortable: true,
+      render: patient => {
+        const address = getPrimaryAddress(patient);
+        return (
+          <span className="truncate">
+            {address ? `${address.city}, ${address.state}` : '-'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '1fr',
+      sortable: true,
+      render: patient => <StatusBadge status={patient.status} />,
+    },
+    {
+      key: 'isi_score',
+      header: 'ISI Score',
+      width: '1fr',
+      sortable: true,
+      render: patient => {
+        const latestScore = getLatestISIScore(patient.isi_scores);
+        return (
+          <span className={latestScore ? 'font-medium' : 'text-gray-400'}>
+            {latestScore ? latestScore.score : '-'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'last_visit',
+      header: 'Last Visit',
+      width: '1fr',
+      sortable: true,
+      render: patient => (
+        <span>
+          {patient.last_visit
+            ? new Date(patient.last_visit).toLocaleDateString()
+            : '-'}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="w-full h-full overflow-auto">
-      <table ref={tableRef} className="w-full border-collapse">
-        <thead className="bg-gray-50 sticky top-0">
-          <tr>
-            <th
-              className="p-4 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100 w-64"
-              onClick={() => onSort('name')}
+      <div className="w-full min-w-full">
+        <div
+          className="sticky top-0 z-10 grid items-center bg-gray-50"
+          style={{
+            gridTemplateColumns: columns.map(col => col.width).join(' '),
+            minWidth: '100%',
+            width: '100%',
+          }}
+        >
+          {columns.map(column => (
+            <div
+              key={column.key}
+              className={clsx(
+                'py-4 pl-6 text-left text-sm font-medium text-gray-500 bg-gray-50',
+                column.sortable && 'cursor-pointer hover:bg-gray-100',
+              )}
+              onClick={() => column.sortable && onSort(column.key)}
             >
-              Name <SortIcon column="name" />
-            </th>
-            <th
-              className="p-4 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100 w-32"
-              onClick={() => onSort('status')}
+              <div className="flex items-center">
+                {column.header}
+                {column.sortable && (
+                  <SortIcon
+                    column={column.key}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {isLoading ? (
+          <div
+            className="grid items-center"
+            style={{
+              gridTemplateColumns: columns.map(col => col.width).join(' '),
+              minWidth: '100%',
+              width: '100%',
+            }}
+          >
+            <div className="col-span-full py-4 pl-6 text-center text-gray-500">
+              Loading...
+            </div>
+          </div>
+        ) : patients.length === 0 ? (
+          <div
+            className="grid items-center"
+            style={{
+              gridTemplateColumns: columns.map(col => col.width).join(' '),
+              minWidth: '100%',
+              width: '100%',
+            }}
+          >
+            <div className="col-span-full py-4 pl-6 text-center text-gray-500">
+              No patients found
+            </div>
+          </div>
+        ) : (
+          patients.map(patient => (
+            <div
+              key={patient.id}
+              onClick={() => onPatientClick(patient)}
+              className="grid items-center hover:bg-gray-50 cursor-pointer"
+              style={{
+                gridTemplateColumns: columns.map(col => col.width).join(' '),
+                minWidth: '100%',
+                width: '100%',
+              }}
             >
-              Status <SortIcon column="status" />
-            </th>
-            <th
-              className="p-4 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100 w-48"
-              onClick={() => onSort('location')}
-            >
-              Location <SortIcon column="location" />
-            </th>
-            <th
-              className="p-4 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100 w-24"
-              onClick={() => onSort('age')}
-            >
-              Age <SortIcon column="age" />
-            </th>
-            <th
-              className="p-4 text-left text-sm font-medium text-gray-500 cursor-pointer hover:bg-gray-100 w-32"
-              onClick={() => onSort('last_visit')}
-            >
-              Last Visit <SortIcon column="last_visit" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <tr>
-              <td colSpan={5} className="p-4 text-center text-gray-500">
-                Loading...
-              </td>
-            </tr>
-          ) : patients.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="p-4 text-center text-gray-500">
-                No patients found
-              </td>
-            </tr>
-          ) : (
-            patients.map(patient => (
-              <tr
-                key={patient.id}
-                onClick={() => onPatientClick(patient)}
-                className="border-t border-gray-200 hover:bg-gray-50 cursor-pointer"
-                style={{ height: rowHeight }}
-              >
-                <td className="p-4 text-sm text-gray-900 w-64">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-300">
-                      <Image
-                        src="/icons/stellar-sleep.png"
-                        alt={getPatientName(patient)}
-                        width={48}
-                        height={48}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="font-medium truncate">
-                      {getPatientName(patient)}
-                    </span>
+              {columns.map(column => (
+                <div
+                  key={column.key}
+                  className="py-4 pl-6 text-sm text-gray-900"
+                >
+                  <div className="flex items-center">
+                    {column.render(patient)}
                   </div>
-                </td>
-                <td className="p-4 text-sm text-gray-900 w-32">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      patient.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : patient.status === 'inquiry'
-                          ? 'bg-blue-100 text-blue-800'
-                          : patient.status === 'onboarding'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                    }`}
-                  >
-                    {patient.status.charAt(0).toUpperCase() +
-                      patient.status.slice(1)}
-                  </span>
-                </td>
-                <td className="p-4 text-sm text-gray-900 w-48 truncate">
-                  {getPrimaryAddress(patient)
-                    ? `${getPrimaryAddress(patient)?.city}, ${getPrimaryAddress(patient)?.state}`
-                    : '-'}
-                </td>
-                <td className="p-4 text-sm text-gray-900 w-24">
-                  {calculateAge(patient.date_of_birth)} years
-                </td>
-                <td className="p-4 text-sm text-gray-900 w-32">
-                  {patient.last_visit
-                    ? new Date(patient.last_visit).toLocaleDateString()
-                    : '-'}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

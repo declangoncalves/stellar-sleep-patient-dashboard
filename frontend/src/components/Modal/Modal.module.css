@@ -11,7 +11,7 @@
 
 @keyframes modalIn {
   from {
-    opacity: 0;
+    opacity: 0.4;
     transform: scale(0.95) translateY(10px);
   }
   to {
@@ -30,20 +30,18 @@
 }
 
 .modalExit {
-  animation: modalOut 0.2s ease-in forwards;
+  animation: modalOut 0.15s ease-in forwards;
 }
 
 .backdropExit {
-  animation: backdropOut 0.2s ease-in forwards;
+  animation: backdropOut 0.15s ease-in forwards;
 }
 
 @keyframes modalOut {
   from {
-    opacity: 1;
     transform: scale(1) translateY(0);
   }
   to {
-    opacity: 0;
     transform: scale(0.95) translateY(10px);
   }
 }

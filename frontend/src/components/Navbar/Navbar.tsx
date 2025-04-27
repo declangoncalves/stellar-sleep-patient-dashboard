@@ -7,9 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   CalendarDaysIcon,
-  ChatBubbleLeftRightIcon,
   CreditCardIcon,
-  EnvelopeIcon,
   UsersIcon,
 } from '@heroicons/react/24/solid';
 
@@ -26,10 +24,8 @@ export function Navbar({
   const pathname = usePathname();
   const links: LinkItem[] = [
     { href: '/patients', label: 'Patients', Icon: UsersIcon },
-    { href: '/calendar', label: 'Calendar', Icon: CalendarDaysIcon },
-    { href: '/mail', label: 'Mail', Icon: EnvelopeIcon },
+    { href: '/scheduling', label: 'Scheduling', Icon: CalendarDaysIcon },
     { href: '/billing', label: 'Billing', Icon: CreditCardIcon },
-    { href: '/chat', label: 'Chat', Icon: ChatBubbleLeftRightIcon },
   ];
 
   return (
