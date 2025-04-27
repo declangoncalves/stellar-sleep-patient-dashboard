@@ -1,76 +1,71 @@
+# serializers.py
+
+from django.db import transaction
 from rest_framework import serializers
 from .models import Patient, Address, ISIScore
 
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = ["id", "patient", "address_line1", "address_line2", "city", "state", "postal_code"]
-        extra_kwargs = {
-            'patient': {'required': False}
-        }
+        fields = ["id", "address_line1", "address_line2", "city", "state", "postal_code"]
 
 class ISIScoreSerializer(serializers.ModelSerializer):
     class Meta:
         model = ISIScore
-        fields = ["id", "patient", "score", "date"]
-        extra_kwargs = {
-            'patient': {'required': False}
-        }
+        fields = ["id", "score", "date"]
 
 class PatientSerializer(serializers.ModelSerializer):
-    # nest addresses and ISI scores
-    addresses = AddressSerializer(many=True, required=False)
-    isi_scores = ISIScoreSerializer(many=True, required=False)
+    addresses   = AddressSerializer(many=True, required=False)
+    isi_scores  = ISIScoreSerializer(many=True, required=False)
 
     class Meta:
         model = Patient
         fields = [
-            "id",
-            "first_name", "middle_name", "last_name",
+            "id", "first_name", "middle_name", "last_name",
             "date_of_birth", "status", "last_visit",
-            "extra_data",
-            "addresses",
+            "additional_fields", "ready_to_discharge",
+            "addresses", "isi_scores",
             "created_at", "updated_at",
-            "ready_to_discharge",
-            "isi_scores",
         ]
         read_only_fields = ["created_at", "updated_at"]
 
+    @transaction.atomic
     def create(self, validated_data):
-        addresses_data = validated_data.pop('addresses', [])
-        isi_scores_data = validated_data.pop('isi_scores', [])
-        patient = super().create(validated_data)
+        addresses  = validated_data.pop("addresses", [])
+        isi_scores = validated_data.pop("isi_scores", [])
+        patient = Patient.objects.create(**validated_data)
 
-        # Create addresses
-        for address_data in addresses_data:
-            Address.objects.create(patient=patient, **address_data)
-
-        # Create ISI scores
-        for score_data in isi_scores_data:
-            ISIScore.objects.create(patient=patient, **score_data)
+        # bulk create is a small performance win if you have many items
+        Address.objects.bulk_create([
+            Address(patient=patient, **addr) for addr in addresses
+        ])
+        ISIScore.objects.bulk_create([
+            ISIScore(patient=patient, **score) for score in isi_scores
+        ])
 
         return patient
 
+    @transaction.atomic
     def update(self, instance, validated_data):
-        addresses_data = validated_data.pop('addresses', [])
-        isi_scores_data = validated_data.pop('isi_scores', [])
-        patient = super().update(instance, validated_data)
+        # Pop but default to None so we can tell “not provided” vs. “provided empty list”
+        addresses  = validated_data.pop("addresses", None)
+        isi_scores = validated_data.pop("isi_scores", None)
 
-        # Update addresses
-        patient.addresses.all().delete()
-        for address_data in addresses_data:
-            Address.objects.create(patient=patient, **address_data)
+        # update flat fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
 
-        # Update ISI scores
-        patient.isi_scores.all().delete()
-        for score_data in isi_scores_data:
-            ISIScore.objects.create(patient=patient, **score_data)
+        if addresses is not None:
+            instance.addresses.all().delete()
+            Address.objects.bulk_create([
+                Address(patient=instance, **addr) for addr in addresses
+            ])
 
-        return patient
+        if isi_scores is not None:
+            instance.isi_scores.all().delete()
+            ISIScore.objects.bulk_create([
+                ISIScore(patient=instance, **score) for score in isi_scores
+            ])
 
-    def to_representation(self, instance):
-        """Convert the instance to a representation that includes nested data."""
-        representation = super().to_representation(instance)
-        representation['addresses'] = AddressSerializer(instance.addresses.all(), many=True).data
-        representation['isi_scores'] = ISIScoreSerializer(instance.isi_scores.all(), many=True).data
-        return representation
+        return instance

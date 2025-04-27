@@ -15,6 +15,9 @@ export function LineChart({ data }: LineChartProps) {
       id: 'isi-line',
       toolbar: { show: false },
       zoom: { enabled: false },
+      animations: {
+        enabled: false,
+      },
     },
     xaxis: {
       type: 'datetime',
@@ -41,15 +44,7 @@ export function LineChart({ data }: LineChartProps) {
     },
     markers: {
       size: 6,
-      colors: undefined,
-      strokeColors: '#fff',
       shape: 'circle',
-      offsetX: 0,
-      offsetY: 0,
-      hover: {
-        size: undefined,
-        sizeOffset: 3,
-      },
     },
   };
 

@@ -21,8 +21,11 @@ class Patient(models.Model):
 
     ready_to_discharge = models.BooleanField(default=False)
 
-    # JSON field for extra configurable fields per patient (flexible key-value data)
-    extra_data = models.JSONField(default=dict, blank=True)
+    # JSON field for additional fields per patient
+    additional_fields = models.JSONField(
+        default=list,
+        blank=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

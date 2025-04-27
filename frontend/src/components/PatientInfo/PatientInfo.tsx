@@ -1,17 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { Patient, Address, ISIScore } from '@/lib/types';
+import {
+  Patient as PatientType,
+  Address as AddressType,
+  ISIScore as ISIScoreType,
+} from '@/lib/types';
 import axios from 'axios';
 import clsx from 'clsx';
-import { Button } from '@/components/Button/Button'; // pages/patient/[id].tsx
+import { Button } from '@/components/Button/Button';
 import { LineChart } from '@/components/LineChart/LineChart';
+import { AdditionalPatientInfo } from './AdditionalPatientInfo';
 
-export default function PatientPage({ patient }) {
-  // assume patient.isiScores is { date: string; score: number }[]
-  const chartData = patient.isiScores.map(({ score, date }) => ({
-    x: date,
-    y: score as number,
+interface Patient extends PatientType {
+  additional_fields: Array<{
+    id: string;
+    name: string;
+    value: string;
+  }>;
+}
+
+type Address = AddressType & {
+  id: number | null;
+};
+
+type ISIScore = ISIScoreType & {
+  id: number | null;
+};
+
+interface PatientPageProps {
+  patient: Patient;
+}
+
+export default function PatientPage({ patient }: PatientPageProps) {
+  const chartData = patient.isi_scores.map((score: ISIScore) => ({
+    x: score.date,
+    y: score.score || 0,
   }));
 
   return (
@@ -33,26 +57,35 @@ interface PatientInfoProps {
 
 interface FormData extends Omit<Patient, 'addresses' | 'isi_scores'> {
   addresses: (Address | (Omit<Address, 'id'> & { id: number | null }))[];
-  isi_scores: (ISIScore | (Omit<ISIScore, 'id'> & { id: null }))[];
+  isi_scores: (ISIScore | (Omit<ISIScore, 'id'> & { id: number | null }))[];
   created_at: string;
   updated_at: string;
   ready_to_discharge: boolean;
   middle_name?: string;
+  last_visit: string | null;
+  additional_fields: Array<{
+    id: string;
+    name: string;
+    value: string;
+  }>;
 }
 
 interface AddressError {
   address_line1?: string;
+  address_line2?: string;
   city?: string;
   state?: string;
   postal_code?: string;
 }
 
+type ValidationError =
+  | string
+  | { [key: number]: AddressError }
+  | { [key: number]: string }
+  | AddressError;
+
 interface ValidationErrors {
-  first_name?: string;
-  last_name?: string;
-  date_of_birth?: string;
-  status?: string;
-  last_visit?: string;
+  [key: string]: ValidationError | undefined;
   addresses?: { [key: number]: AddressError };
   isi_scores?: { [key: number]: string };
 }
@@ -64,20 +97,21 @@ export function PatientInfo({
   isCreateMode = false,
 }: PatientInfoProps) {
   const [activeTab, setActiveTab] = useState<TabType>('basic');
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormData>(() => ({
     id: patient.id,
     first_name: patient.first_name,
     middle_name: patient.middle_name,
     last_name: patient.last_name,
     date_of_birth: patient.date_of_birth,
     status: patient.status,
-    last_visit: patient.last_visit,
+    last_visit: patient.last_visit || null,
     isi_scores: patient.isi_scores || [],
     addresses: patient.addresses || [],
     created_at: patient.created_at || new Date().toISOString(),
     updated_at: patient.updated_at || new Date().toISOString(),
     ready_to_discharge: patient.ready_to_discharge || false,
-  });
+    additional_fields: patient.additional_fields || [],
+  }));
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -189,30 +223,25 @@ export function PatientInfo({
             date_of_birth: formData.date_of_birth,
             status: formData.status,
             last_visit: formData.last_visit,
+            additional_fields: formData.additional_fields,
+            addresses: formData.addresses,
+            isi_scores: formData.isi_scores,
           },
         );
         updatedPatient = response.data;
       } else {
         // Update existing patient
         const response = await axios.put(
-          `http://127.0.0.1:8000/api/patients/${formData.id}/`,
+          `http://127.0.0.1:8000/api/patients/${patient.id}/`,
           {
             first_name: formData.first_name,
             last_name: formData.last_name,
             date_of_birth: formData.date_of_birth,
             status: formData.status,
             last_visit: formData.last_visit,
-            addresses: formData.addresses.map(address => ({
-              address_line1: address.address_line1,
-              address_line2: address.address_line2,
-              city: address.city,
-              state: address.state,
-              postal_code: address.postal_code,
-            })),
-            isi_scores: formData.isi_scores.map(score => ({
-              score: score.score,
-              date: score.date,
-            })),
+            additional_fields: formData.additional_fields,
+            addresses: formData.addresses,
+            isi_scores: formData.isi_scores,
           },
         );
         updatedPatient = response.data;
@@ -221,6 +250,7 @@ export function PatientInfo({
       onSaved(updatedPatient);
     } catch (error) {
       console.error('Error saving patient:', error);
+      // Handle error appropriately
     } finally {
       setIsSaving(false);
     }
@@ -234,15 +264,13 @@ export function PatientInfo({
   };
 
   const handleAddAddress = () => {
-    const newAddress: Address = {
+    const newAddress: Omit<Address, 'id'> & { id: number | null } = {
       id: null,
       address_line1: '',
       address_line2: '',
       city: '',
       state: '',
       postal_code: '',
-      created_at: '',
-      updated_at: '',
     };
     setFormData(prev => ({
       ...prev,
@@ -258,160 +286,183 @@ export function PatientInfo({
     setFormData(prev => ({
       ...prev,
       addresses: prev.addresses.map((address, i) =>
-        i === index ? { ...address, [field]: value || '' } : address,
+        i === index ? { ...address, [field]: value } : address,
       ),
     }));
   };
 
+  const handleAdditionalFieldsChange = (
+    fields: Array<{ id: string; name: string; value: string }>,
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      additional_fields: fields,
+    }));
+  };
+
+  const getErrorMessage = (error: ValidationError | undefined): string => {
+    if (!error) return '';
+    if (typeof error === 'string') return error;
+    if ('address_line1' in error || 'address_line2' in error) {
+      return Object.values(error).filter(Boolean).join(', ');
+    }
+    return JSON.stringify(error);
+  };
+
+  const getAddressError = (
+    errors: ValidationErrors,
+    index: number,
+  ): AddressError | undefined => {
+    return errors.addresses?.[index];
+  };
+
+  const getISIScoreError = (
+    errors: ValidationErrors,
+    index: number,
+  ): string | undefined => {
+    return errors.isi_scores?.[index];
+  };
+
   const renderAddresses = () => (
-    <div className="space-y-4 pb-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Addresses</h3>
-      </div>
-      {formData.addresses.map((address, index) => (
-        <div
-          key={index}
-          className="border border-gray-300 rounded-lg p-4 space-y-4"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 1
-              </label>
-              <input
-                type="text"
-                value={address.address_line1}
-                onChange={e =>
-                  handleAddressChange(index, 'address_line1', e.target.value)
-                }
-                className={clsx(
-                  'w-full p-2 border rounded',
-                  errors.addresses?.[index]?.address_line1
-                    ? 'border-red-500'
-                    : 'border-gray-300',
+    <div className="space-y-4">
+      {formData.addresses.map((address, index) => {
+        const addressError = getAddressError(errors, index);
+        return (
+          <div key={index} className="border p-4 rounded-lg">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  value={address.address_line1}
+                  onChange={e =>
+                    handleAddressChange(index, 'address_line1', e.target.value)
+                  }
+                  className={clsx(
+                    'w-full p-2 border rounded',
+                    addressError?.address_line1
+                      ? 'border-red-500'
+                      : 'border-gray-300',
+                  )}
+                />
+                {addressError?.address_line1 && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getErrorMessage(addressError)}
+                  </p>
                 )}
-              />
-              {errors.addresses?.[index]?.address_line1 && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.addresses[index].address_line1}
-                </p>
-              )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={address.address_line2}
+                  onChange={e =>
+                    handleAddressChange(index, 'address_line2', e.target.value)
+                  }
+                  className={clsx(
+                    'w-full p-2 border rounded',
+                    addressError?.address_line2
+                      ? 'border-red-500'
+                      : 'border-gray-300',
+                  )}
+                />
+                {addressError?.address_line2 && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getErrorMessage(addressError)}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address Line 2
-              </label>
-              <input
-                type="text"
-                value={address.address_line2}
-                onChange={e =>
-                  handleAddressChange(index, 'address_line2', e.target.value)
-                }
-                className={clsx(
-                  'w-full p-2 border rounded',
-                  errors.addresses?.[index]?.address_line2
-                    ? 'border-red-500'
-                    : 'border-gray-300',
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={address.city}
+                  onChange={e =>
+                    handleAddressChange(index, 'city', e.target.value)
+                  }
+                  className={clsx(
+                    'w-full p-2 border rounded',
+                    addressError?.city ? 'border-red-500' : 'border-gray-300',
+                  )}
+                />
+                {addressError?.city && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getErrorMessage(addressError)}
+                  </p>
                 )}
-              />
-              {errors.addresses?.[index]?.address_line2 && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.addresses[index].address_line2}
-                </p>
-              )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  State
+                </label>
+                <input
+                  type="text"
+                  value={address.state}
+                  onChange={e =>
+                    handleAddressChange(index, 'state', e.target.value)
+                  }
+                  className={clsx(
+                    'w-full p-2 border rounded',
+                    addressError?.state ? 'border-red-500' : 'border-gray-300',
+                  )}
+                />
+                {addressError?.state && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getErrorMessage(addressError)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Postal Code
+                </label>
+                <input
+                  type="text"
+                  value={address.postal_code}
+                  onChange={e =>
+                    handleAddressChange(index, 'postal_code', e.target.value)
+                  }
+                  className={clsx(
+                    'w-full p-2 border rounded',
+                    addressError?.postal_code
+                      ? 'border-red-500'
+                      : 'border-gray-300',
+                  )}
+                />
+                {addressError?.postal_code && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {getErrorMessage(addressError)}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFormData(prev => ({
+                    ...prev,
+                    addresses: prev.addresses.filter((_, i) => i !== index),
+                  }));
+                }}
+              >
+                Delete Address
+              </Button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                City
-              </label>
-              <input
-                type="text"
-                value={address.city}
-                onChange={e =>
-                  handleAddressChange(index, 'city', e.target.value)
-                }
-                className={clsx(
-                  'w-full p-2 border rounded',
-                  errors.addresses?.[index]?.city
-                    ? 'border-red-500'
-                    : 'border-gray-300',
-                )}
-              />
-              {errors.addresses?.[index]?.city && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.addresses[index].city}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                State
-              </label>
-              <input
-                type="text"
-                value={address.state}
-                onChange={e =>
-                  handleAddressChange(index, 'state', e.target.value)
-                }
-                className={clsx(
-                  'w-full p-2 border rounded',
-                  errors.addresses?.[index]?.state
-                    ? 'border-red-500'
-                    : 'border-gray-300',
-                )}
-              />
-              {errors.addresses?.[index]?.state && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.addresses[index].state}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Postal Code
-              </label>
-              <input
-                type="text"
-                value={address.postal_code}
-                onChange={e =>
-                  handleAddressChange(index, 'postal_code', e.target.value)
-                }
-                className={clsx(
-                  'w-full p-2 border rounded',
-                  errors.addresses?.[index]?.postal_code
-                    ? 'border-red-500'
-                    : 'border-gray-300',
-                )}
-              />
-              {errors.addresses?.[index]?.postal_code && (
-                <p className="mt-1 text-sm text-red-600">
-                  {errors.addresses[index].postal_code}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="danger"
-              onClick={() => {
-                setFormData(prev => ({
-                  ...prev,
-                  addresses: prev.addresses.filter((_, i) => i !== index),
-                }));
-              }}
-            >
-              Delete Address
-            </Button>
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-center">
-        <Button variant="primary" onClick={handleAddAddress}>
-          Add Address
-        </Button>
-      </div>
+        );
+      })}
+      <Button variant="primary" onClick={handleAddAddress}>
+        Add Address
+      </Button>
     </div>
   );
 
@@ -433,7 +484,9 @@ export function PatientInfo({
             )}
           />
           {errors.first_name && (
-            <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {getErrorMessage(errors.first_name)}
+            </p>
           )}
         </div>
         <div>
@@ -463,7 +516,9 @@ export function PatientInfo({
             )}
           />
           {errors.last_name && (
-            <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {getErrorMessage(errors.last_name)}
+            </p>
           )}
         </div>
       </div>
@@ -484,7 +539,9 @@ export function PatientInfo({
             )}
           />
           {errors.date_of_birth && (
-            <p className="mt-1 text-sm text-red-600">{errors.date_of_birth}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {getErrorMessage(errors.date_of_birth)}
+            </p>
           )}
         </div>
         <div>
@@ -502,7 +559,9 @@ export function PatientInfo({
             )}
           />
           {errors.last_visit && (
-            <p className="mt-1 text-sm text-red-600">{errors.last_visit}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {getErrorMessage(errors.last_visit)}
+            </p>
           )}
         </div>
         <div>
@@ -524,7 +583,9 @@ export function PatientInfo({
             <option value="churned">Churned</option>
           </select>
           {errors.status && (
-            <p className="mt-1 text-sm text-red-600">{errors.status}</p>
+            <p className="mt-1 text-sm text-red-600">
+              {getErrorMessage(errors.status)}
+            </p>
           )}
         </div>
       </div>
@@ -552,76 +613,78 @@ export function PatientInfo({
         </div>
 
         <div className="space-y-4">
-          {formData.isi_scores.map((score, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-2 gap-4 p-4 border rounded"
-            >
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Score
-                </label>
-                <input
-                  type="number"
-                  value={score.score ?? ''}
-                  onChange={e => {
-                    const newScores = [...formData.isi_scores];
-                    newScores[index] = {
-                      ...newScores[index],
-                      score:
-                        e.target.value === ''
-                          ? undefined
-                          : parseInt(e.target.value),
-                    };
-                    setFormData(prev => ({ ...prev, isi_scores: newScores }));
-                  }}
-                  className={clsx(
-                    'w-full p-2 border rounded',
-                    errors.isi_scores?.[index]
-                      ? 'border-red-500'
-                      : 'border-gray-300',
-                  )}
-                />
-                {errors.isi_scores?.[index] && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.isi_scores[index]}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date
-                </label>
-                <div className="flex gap-2">
+          {formData.isi_scores.map((score, index) => {
+            const scoreError = getISIScoreError(errors, index);
+            return (
+              <div
+                key={index}
+                className="grid grid-cols-2 gap-4 p-4 border rounded"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Score
+                  </label>
                   <input
-                    type="date"
-                    value={score.date}
+                    type="number"
+                    value={score.score ?? ''}
                     onChange={e => {
                       const newScores = [...formData.isi_scores];
                       newScores[index] = {
                         ...newScores[index],
-                        date: e.target.value,
+                        score:
+                          e.target.value === ''
+                            ? undefined
+                            : parseInt(e.target.value),
                       };
                       setFormData(prev => ({ ...prev, isi_scores: newScores }));
                     }}
                     className={clsx(
                       'w-full p-2 border rounded',
-                      errors.isi_scores?.[index]
-                        ? 'border-red-500'
-                        : 'border-gray-300',
+                      scoreError ? 'border-red-500' : 'border-gray-300',
                     )}
                   />
-                  <Button
-                    variant="outline"
-                    onClick={() => handleDeleteISIScore(index)}
-                    className="whitespace-nowrap"
-                  >
-                    Delete
-                  </Button>
+                  {scoreError && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {getErrorMessage(scoreError)}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={score.date}
+                      onChange={e => {
+                        const newScores = [...formData.isi_scores];
+                        newScores[index] = {
+                          ...newScores[index],
+                          date: e.target.value,
+                        };
+                        setFormData(prev => ({
+                          ...prev,
+                          isi_scores: newScores,
+                        }));
+                      }}
+                      className={clsx(
+                        'w-full p-2 border rounded',
+                        scoreError ? 'border-red-500' : 'border-gray-300',
+                      )}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDeleteISIScore(index)}
+                      className="whitespace-nowrap"
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex justify-center pb-6">
             <Button
               variant="outline"
@@ -648,10 +711,17 @@ export function PatientInfo({
   };
 
   const renderAdditionalInfo = () => (
-    <div className="space-y-6">
-      <div className="text-gray-500">
-        Additional information form fields will be configurable here.
-      </div>
+    <div className="space-y-4">
+      <AdditionalPatientInfo
+        fields={formData.additional_fields}
+        onChange={handleAdditionalFieldsChange}
+        errors={Object.fromEntries(
+          Object.entries(errors).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? value : JSON.stringify(value),
+          ]),
+        )}
+      />
     </div>
   );
 
