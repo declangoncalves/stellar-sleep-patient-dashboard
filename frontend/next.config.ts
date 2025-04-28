@@ -1,6 +1,6 @@
 // frontend/next.config.ts
-import type { NextConfig } from "next";
-import ESLintPlugin from "eslint-webpack-plugin";
+import type { NextConfig } from 'next';
+import ESLintPlugin from 'eslint-webpack-plugin';
 
 const nextConfig: NextConfig = {
   // other Next.js config options…
@@ -9,11 +9,11 @@ const nextConfig: NextConfig = {
     if (dev && !isServer) {
       config.plugins.push(
         new ESLintPlugin({
-          extensions: ["js", "jsx", "ts", "tsx"],
-          emitWarning: true,    // show warnings in console
+          extensions: ['js', 'jsx', 'ts', 'tsx'],
+          emitWarning: true, // show warnings in console
           fix: true,
-          failOnError: false,   // don’t break compilation on errors
-        })
+          failOnError: false, // don’t break compilation on errors
+        }),
       );
     }
     return config;

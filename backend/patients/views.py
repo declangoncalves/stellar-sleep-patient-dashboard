@@ -1,8 +1,14 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend, FilterSet, CharFilter
 from django.db.models import Max, Subquery, OuterRef
-from .models import Patient, Address, ISIScore
-from .serializers import PatientSerializer, AddressSerializer, ISIScoreSerializer
+from .models import Patient, Address, ISIScore, CustomField, CustomFieldValue
+from .serializers import (
+    PatientSerializer,
+    AddressSerializer,
+    ISIScoreSerializer,
+    CustomFieldSerializer,
+    CustomFieldValueSerializer
+)
 
 class PatientFilter(FilterSet):
     city = CharFilter(field_name='addresses__city', lookup_expr='icontains')
@@ -49,3 +55,21 @@ class ISIScoreViewSet(viewsets.ModelViewSet):
     ordering_fields = ['date', 'score']
     # Order by date descending, then by id descending to ensure consistent ordering
     ordering = ['-date', '-id']  # Most recent scores first, then by id for same dates
+
+class CustomFieldViewSet(viewsets.ModelViewSet):
+    queryset = CustomField.objects.all()
+    serializer_class = CustomFieldSerializer
+    pagination_class = None  # Disable pagination for this viewset
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        # Ensure we're returning a list
+        if not isinstance(response.data, list):
+            response.data = list(response.data)
+        return response
+
+class CustomFieldValueViewSet(viewsets.ModelViewSet):
+    queryset = CustomFieldValue.objects.all()
+    serializer_class = CustomFieldValueSerializer
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    filterset_fields = ['patient', 'field_definition']
