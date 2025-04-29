@@ -12,7 +12,7 @@ interface SearchbarProps {
 }
 
 export function Searchbar({
-  placeholder = 'Search appointment, patient or etc…',
+  placeholder = 'Search…',
   onSearch,
   onChange,
   value = '',

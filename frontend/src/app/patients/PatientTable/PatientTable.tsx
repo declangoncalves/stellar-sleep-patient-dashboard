@@ -1,6 +1,7 @@
 'use client';
 
-import type { Patient, ISIScore } from '@/lib/types';
+import type { ISIScore } from '@/lib/types';
+import { Patient } from '@/lib/api';
 import Image from 'next/image';
 import clsx from 'clsx';
 
