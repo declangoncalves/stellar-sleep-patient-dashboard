@@ -27,7 +27,6 @@ export function LineChart({ data }: LineChartProps) {
       },
     },
     yaxis: {
-      title: { text: 'ISI Score' },
       min: 0,
       max: Math.ceil(maxScore * 1.1),
       decimalsInFloat: 0,

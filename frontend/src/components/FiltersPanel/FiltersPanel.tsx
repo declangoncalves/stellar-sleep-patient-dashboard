@@ -56,22 +56,18 @@ export function FiltersPanel({
       className="absolute right-0 mt-2 w-80 bg-white rounded-lg border border-gray-200 shadow-lg z-50"
     >
       <div className="p-4 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
-          </label>
-          <select
-            value={statusValue}
-            onChange={e => onStatusChange(e.target.value)}
-            className="w-full p-2 border rounded text-black"
-          >
-            <option value="">All Statuses</option>
-            <option value="inquiry">Inquiry</option>
-            <option value="onboarding">Onboarding</option>
-            <option value="active">Active</option>
-            <option value="churned">Churned</option>
-          </select>
-        </div>
+        <Input
+          label="Status"
+          value={statusValue}
+          onChange={e => onStatusChange(e.target.value)}
+          options={[
+            { value: '', label: 'All Statuses' },
+            { value: 'inquiry', label: 'Inquiry' },
+            { value: 'onboarding', label: 'Onboarding' },
+            { value: 'active', label: 'Active' },
+            { value: 'churned', label: 'Churned' },
+          ]}
+        />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             City
@@ -94,18 +90,14 @@ export function FiltersPanel({
             placeholder="Filter by state"
           />
         </div>
+        {hasActiveFilters && (
+          <div className="text-red-300 pt-2">
+            <Button variant="danger" className="w-full" onClick={onClearAll}>
+              Clear All
+            </Button>
+          </div>
+        )}
       </div>
-      {hasActiveFilters && (
-        <div className="text-red-300 pb-4">
-          <Button
-            variant="ghost"
-            onClick={onClearAll}
-            className="w-full text-red-400 font-bold"
-          >
-            Clear All
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

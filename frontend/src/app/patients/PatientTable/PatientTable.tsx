@@ -188,7 +188,7 @@ export function PatientTable({
   ];
 
   return (
-    <div className="w-full h-full overflow-auto">
+    <div className="w-full h-full overflow-y-scroll min-h-[400px]">
       <div className="w-full min-w-full">
         <div
           className="sticky top-0 z-10 grid items-center bg-gray-50"
@@ -220,7 +220,7 @@ export function PatientTable({
             </div>
           ))}
         </div>
-        {isLoading ? (
+        {isLoading && patients.length === 0 ? (
           <div
             className="grid items-center"
             style={{

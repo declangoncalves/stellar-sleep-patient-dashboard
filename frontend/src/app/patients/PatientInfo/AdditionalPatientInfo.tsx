@@ -13,7 +13,7 @@ import { customFieldsApi, utils } from '@/lib/api';
 import { Button } from '../../../components/Button/Button';
 import { Input } from '@/components/Input/Input';
 import { useDebounce } from '@/hooks/useDebounce';
-
+import { PlusIcon } from '@heroicons/react/24/solid';
 interface Props {
   patientId: number;
   customFieldValues?: CustomFieldValue[];
@@ -67,10 +67,14 @@ function AdditionalPatientInfoInner({
     data: customFields = [],
     isFetching,
     error,
-  } = useQuery('customFields', customFieldsApi.fetchCustomFields, {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
-  });
+  } = useQuery<CustomField[], Error>(
+    'customFields',
+    customFieldsApi.fetchCustomFields,
+    {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    },
+  );
 
   // For mutations
   const queryClient = useQueryClient();
@@ -113,32 +117,32 @@ function AdditionalPatientInfoInner({
 
     const newValues = getValuesRecord(customFieldValues);
 
-    // Deep comparison to avoid unnecessary updates
-    let hasChanges = false;
+    // Only update values that haven't been modified locally
+    setValues(prev => {
+      const updatedValues = { ...prev };
+      let hasChanges = false;
 
-    // Check for added or modified values
-    for (const [fieldId, value] of Object.entries(newValues)) {
-      const numId = Number(fieldId);
-      if (!(numId in values) || values[numId] !== value) {
-        hasChanges = true;
-        break;
-      }
-    }
-
-    // Check for removed values
-    if (!hasChanges) {
-      for (const fieldId of Object.keys(values)) {
-        if (!(fieldId in newValues)) {
-          hasChanges = true;
-          break;
+      // Update values from props that haven't been modified locally
+      for (const [fieldId, value] of Object.entries(newValues)) {
+        if (!locallyUpdated.current || !(fieldId in prev)) {
+          if (updatedValues[fieldId] !== value) {
+            updatedValues[fieldId] = value;
+            hasChanges = true;
+          }
         }
       }
-    }
 
-    if (hasChanges) {
-      setValues(newValues);
-    }
-  }, [customFieldValues, getValuesRecord, values]);
+      // Remove values that no longer exist in props
+      for (const fieldId of Object.keys(prev)) {
+        if (!(fieldId in newValues)) {
+          delete updatedValues[fieldId];
+          hasChanges = true;
+        }
+      }
+
+      return hasChanges ? updatedValues : prev;
+    });
+  }, [customFieldValues, getValuesRecord]);
 
   // Process updates when debounced values change
   useEffect(() => {
@@ -166,7 +170,7 @@ function AdditionalPatientInfoInner({
 
         if (existing) {
           return { ...existing, value };
-        } else if (value.trim()) {
+        } else {
           return {
             id: '0', // Temporary ID for new values
             field_definition: idStr,
@@ -174,7 +178,6 @@ function AdditionalPatientInfoInner({
             value,
           };
         }
-        return existing!;
       })
       .filter(Boolean) as CustomFieldValue[];
 
@@ -301,7 +304,11 @@ function AdditionalPatientInfoInner({
 
   // Handle field value change
   const handleChange = (fieldId: string, value: string) => {
-    setValues(prev => ({ ...prev, [fieldId]: value }));
+    setValues(prev => {
+      const newValues = { ...prev, [fieldId]: value };
+      locallyUpdated.current = true;
+      return newValues;
+    });
   };
 
   // Add new field with validation
@@ -323,12 +330,43 @@ function AdditionalPatientInfoInner({
       {/* Loading state */}
       {isFetching && !customFields.length ? (
         <div className="flex items-center justify-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <div
+            role="status"
+            className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
+          />
         </div>
+      ) : error ? (
+        <div className="text-red-500">Failed to fetch: {errorMessage}</div>
       ) : (
         <>
+          {/* Add new field form */}
+          <form onSubmit={handleAddField} className="mb-6">
+            <div className="flex grid-cols-2 items-start justify-start gap-4 pb-6 mb-2 border-b border-gray-200">
+              <div className="flex-1">
+                <Input
+                  id="new-field-name"
+                  label="Add New Field"
+                  value={newFieldName}
+                  onChange={e => handleNewFieldNameChange(e.target.value)}
+                  error={fieldNameError || undefined}
+                  placeholder="Enter field name"
+                  maxLength={100}
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={addFieldMutation.isLoading}
+                variant="primary"
+                className="h-12 mt-7"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                {addFieldMutation.isLoading ? 'Adding...' : 'Add New Field'}
+              </Button>
+            </div>
+          </form>
+
           {/* Custom fields list */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-8">
             {customFields.map(field => (
               <div key={field.id} className="flex flex-col space-y-1">
                 <Input
@@ -349,29 +387,12 @@ function AdditionalPatientInfoInner({
                 />
               </div>
             ))}
+            {customFields.length === 0 && (
+              <div className="pl-2 pt-4 text-gray-500">
+                No custom fields added
+              </div>
+            )}
           </div>
-
-          {/* Add new field form */}
-          <form onSubmit={handleAddField} className="mt-6">
-            <div className="flex flex-col space-y-1">
-              <Input
-                id="new-field-name"
-                label="Add New Field"
-                value={newFieldName}
-                onChange={e => handleNewFieldNameChange(e.target.value)}
-                error={fieldNameError || undefined}
-                placeholder="Enter field name"
-                maxLength={100}
-              />
-              <Button
-                type="submit"
-                disabled={addFieldMutation.isLoading}
-                variant="primary"
-              >
-                {addFieldMutation.isLoading ? 'Adding...' : 'Add Field'}
-              </Button>
-            </div>
-          </form>
         </>
       )}
     </div>

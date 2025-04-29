@@ -56,7 +56,12 @@ export function useFilters(debounceDelay = 600): UseFiltersReturn {
     setFilters(prev => ({ ...prev, search: value }));
 
   const clearAll = () => {
-    const emptyState = { status: '', city: '', state: '', search: '' };
+    const emptyState = {
+      status: '',
+      city: '',
+      state: '',
+      search: filters.search,
+    };
     setFilters(emptyState);
     setDebouncedFilters(emptyState);
   };

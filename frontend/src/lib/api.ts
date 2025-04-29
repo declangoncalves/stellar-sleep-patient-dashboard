@@ -187,7 +187,7 @@ export const patientsApi = {
 
     return {
       patients: uniquePatients,
-      totalPages: Math.ceil(data.count / 10),
+      totalPages: Math.ceil(data.count / 20),
     };
   },
 };

@@ -31,6 +31,7 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
     deleteAddress,
     updateISIScore,
     deleteISIScore,
+    addISIScore,
     updateCustomField,
   } = usePatientForm();
 
@@ -43,10 +44,10 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
               variant="ghost"
               onClick={() => setActiveTab('basic')}
               className={clsx(
-                'py-2 px-1 border-b-2 font-medium text-sm',
+                'py-2 px-1 border-b-2 font-medium! text-sm',
                 activeTab === 'basic'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                  : 'border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400',
               )}
             >
               Basic Information
@@ -55,10 +56,10 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
               variant="ghost"
               onClick={() => setActiveTab('sleep')}
               className={clsx(
-                'py-2 px-1 border-b-2 font-medium text-sm',
+                'py-2 px-1 border-b-2 font-medium! text-sm',
                 activeTab === 'sleep'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                  : 'border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400',
               )}
             >
               Sleep Tracking
@@ -67,10 +68,10 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
               variant="ghost"
               onClick={() => setActiveTab('additional')}
               className={clsx(
-                'py-2 px-1 border-b-2 font-medium text-sm',
+                'py-2 px-1 border-b-2 font-medium! text-sm',
                 activeTab === 'additional'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                  : 'border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-400',
               )}
             >
               Additional Information
@@ -79,7 +80,7 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto pr-2">
+      <div className="flex-1 overflow-auto pr-2 pb-6">
         {activeTab === 'basic' && (
           <GeneralPatientInfo
             formData={formData}
@@ -95,6 +96,7 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
             isiScores={formData.isi_scores}
             onISIScoresChange={updateISIScore}
             onDeleteScore={deleteISIScore}
+            onAddScore={addISIScore}
             errors={errors.isi_scores}
           />
         )}
@@ -107,8 +109,8 @@ function PatientInfoContent({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      <div className="flex-none pt-4 border-t">
-        <div className="flex justify-end space-x-4">
+      <div className="flex-none pt-4 border-t border-gray-200">
+        <div className="flex justify-between space-x-4">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

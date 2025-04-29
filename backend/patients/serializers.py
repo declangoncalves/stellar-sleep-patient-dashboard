@@ -112,19 +112,37 @@ class PatientSerializer(serializers.ModelSerializer):
 
         if custom_values is not None:
             try:
-                instance.custom_field_values.all().delete()
+                # Get existing custom field values
+                existing_values = {
+                    val.field_definition_id: val
+                    for val in instance.custom_field_values.all()
+                }
+
+                # Process each new value
                 for val in custom_values:
-                    # Ensure field_definition is properly extracted
                     field_def = val.get('field_definition')
                     if not field_def:
                         continue
 
-                    # Create the custom field value
-                    CustomFieldValue.objects.create(
-                        patient=instance,
-                        field_definition=field_def,
-                        value=val.get('value', '')
-                    )
+                    # If the value exists, update it
+                    if field_def.id in existing_values:
+                        existing_val = existing_values[field_def.id]
+                        existing_val.value = val.get('value', '')
+                        existing_val.save()
+                    else:
+                        # If it's new, create it
+                        CustomFieldValue.objects.create(
+                            patient=instance,
+                            field_definition=field_def,
+                            value=val.get('value', '')
+                        )
+
+                # Delete any values that weren't in the new data
+                new_field_ids = {val.get('field_definition').id for val in custom_values if val.get('field_definition')}
+                for field_id, existing_val in existing_values.items():
+                    if field_id not in new_field_ids:
+                        existing_val.delete()
+
             except Exception as e:
                 print(f"Error processing custom fields: {e}")
                 print(f"Custom values data: {custom_values}")

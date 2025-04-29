@@ -47,7 +47,7 @@ export function Modal({ children, onClose, title }: ModalProps) {
       onClick={handleClose}
     >
       <div
-        className={`${styles.modal} ${isExiting ? styles.modalExit : ''} px-10 pt-12 pb-6 bg-white rounded-lg shadow-lg flex flex-col max-h-[90vh]`}
+        className={`${styles.modal} ${isExiting ? styles.modalExit : ''} pl-10 pr-8 pt-12 pb-6 bg-white rounded-lg shadow-lg flex flex-col max-h-[90vh]`}
         onClick={e => e.stopPropagation()}
       >
         {title && (

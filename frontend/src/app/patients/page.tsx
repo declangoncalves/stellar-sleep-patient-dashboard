@@ -12,6 +12,10 @@ import { Button } from '@/components/Button/Button';
 import { useFilters } from './hooks/useFilters';
 import { patientsApi } from '@/lib/api';
 import { FiltersPanel } from '../../components/FiltersPanel/FiltersPanel';
+import {
+  AdjustmentsVerticalIcon,
+  UserPlusIcon,
+} from '@heroicons/react/24/solid';
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -88,6 +92,11 @@ export default function PatientsPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    // Scroll to top of the table container
+    const tableContainer = document.querySelector('.overflow-y-scroll');
+    if (tableContainer) {
+      tableContainer.scrollTo({ top: 0 });
+    }
   };
 
   const handleAddPatient = () => {
@@ -169,6 +178,7 @@ export default function PatientsPage() {
                 variant="outline"
                 onClick={() => setIsFiltersOpen(!isFiltersOpen)}
               >
+                <AdjustmentsVerticalIcon className="w-4 h-4 mr-1" />
                 Filters
                 {hasActiveFilters && (
                   <span className="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded-full">
@@ -194,6 +204,7 @@ export default function PatientsPage() {
               />
             </div>
             <Button variant="primary" onClick={handleAddPatient}>
+              <UserPlusIcon className="w-4 h-4 mr-2" />
               Add Patient
             </Button>
           </div>
