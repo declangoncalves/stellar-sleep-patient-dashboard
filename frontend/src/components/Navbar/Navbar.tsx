@@ -44,6 +44,7 @@ export function Navbar({
             width={120}
             height={32}
             priority
+            style={{ height: 'auto' }}
           />
           <ul className="flex space-x-1">
             {links.map(({ href, Icon, label }) => {

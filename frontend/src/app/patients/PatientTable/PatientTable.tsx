@@ -1,9 +1,9 @@
 'use client';
 
-import type { ISIScore } from '@/lib/types';
-import { Patient } from '@/lib/api';
+import type { ISIScore, Patient } from '@/lib/types';
 import Image from 'next/image';
 import clsx from 'clsx';
+import { useState } from 'react';
 
 // Types
 interface PatientTableProps {
@@ -54,6 +54,15 @@ const getLatestISIScore = (scores: ISIScore[]) => {
   return scores[0]; // First score is already the most recent
 };
 
+// Utility functions for PatientAvatar
+const getInitials = (name: string) => {
+  if (!name) return '';
+  const parts = name.split(' ').filter(part => part.length > 0);
+  return parts.length > 1
+    ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+    : parts[0].substring(0, 2).toUpperCase();
+};
+
 // Components
 const SortIcon = ({
   column,
@@ -65,7 +74,7 @@ const SortIcon = ({
   sortDirection: 'asc' | 'desc';
 }) => {
   const reverseFieldMap: Record<string, string> = {
-    last_name: 'name',
+    first_name: 'name',
     status: 'status',
     addresses__city: 'location',
     date_of_birth: 'age',
@@ -93,17 +102,33 @@ const StatusBadge = ({ status }: { status: Patient['status'] }) => {
   );
 };
 
-const PatientAvatar = ({ name }: { name: string }) => (
-  <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-300">
-    <Image
-      src="/icons/stellar-sleep.png"
-      alt={name}
-      width={48}
-      height={48}
-      className="w-full h-full object-cover"
-    />
-  </div>
-);
+const PatientAvatar = ({ name }: { name: string }) => {
+  const [imageError, setImageError] = useState(false);
+  const initials = getInitials(name);
+  const bgColor = `hsl(${name.length * 10 % 360}, 70%, 80%)`;
+
+  return (
+    <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-300">
+      {!imageError ? (
+        <Image
+          src="/icons/stellar-sleep.png"
+          alt={name}
+          width={48}
+          height={48}
+          className="w-full h-full object-cover"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <div
+          className="w-full h-full flex items-center justify-center text-gray-800 font-medium"
+          style={{ backgroundColor: bgColor }}
+        >
+          {initials}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function PatientTable({
   patients,

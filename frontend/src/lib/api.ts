@@ -5,7 +5,20 @@ import {
   PatientData,
 } from '@/lib/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// Determine if we're in a development or production environment
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Set the base URL based on the environment
+let API_BASE_URL = isDevelopment
+  ? 'http://127.0.0.1:8000'
+  : (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://stellar-sleep-patient-dashboard.onrender.com');
+
+// Make sure it starts with https:// or http://
+if (API_BASE_URL && !API_BASE_URL.startsWith('http')) {
+  API_BASE_URL = `https://${API_BASE_URL}`;
+}
+
+console.log('API_BASE_URL:', API_BASE_URL, 'Environment:', process.env.NODE_ENV);
 
 // Extended Patient type with additional fields
 export type ApiPatient = Patient;

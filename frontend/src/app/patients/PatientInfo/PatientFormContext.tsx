@@ -288,7 +288,7 @@ export function PatientFormProvider({
         ...prev.isi_scores,
         {
           id: null,
-          score: undefined,
+          score: 0,
           date: new Date().toISOString().split('T')[0],
         },
       ],

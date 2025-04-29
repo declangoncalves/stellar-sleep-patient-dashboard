@@ -15,7 +15,7 @@ import { Input } from '@/components/Input/Input';
 import { useDebounce } from '@/hooks/useDebounce';
 import { PlusIcon } from '@heroicons/react/24/solid';
 interface Props {
-  patientId: number;
+  patientId: string | number;
   customFieldValues?: CustomFieldValue[];
   onUpdate: (updatedValues: CustomFieldValue[]) => void;
 }

@@ -1,5 +1,9 @@
 # Patient Dashboard
 
+## Live Demo
+
+Visit the live application: [Stellar Sleep Patient Dashboard](https://stellar-sleep-patient-dashboard.vercel.app/patients)
+
 ## Features
 
 - Patient management with detailed information
@@ -11,7 +15,10 @@
 ## Environment Setup
 
 1. Clone the repository
-2. For local development, no environment variables are required
+2. Create a `.env.local` file in the frontend directory with the following variable:
+   ```
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+   ```
 3. Install pnpm if you haven't already:
 
    ```bash
@@ -90,3 +97,22 @@ python manage.py test
 cd frontend
 pnpm test
 ```
+
+## Deployment
+
+The application is deployed across two platforms:
+
+- **Frontend**: Hosted on [Vercel](https://vercel.com) at [https://stellar-sleep-patient-dashboard.vercel.app/patients](https://stellar-sleep-patient-dashboard.vercel.app/patients)
+- **Backend API**: Hosted on [Render](https://render.com) at [https://stellar-sleep-patient-dashboard.onrender.com](https://stellar-sleep-patient-dashboard.onrender.com)
+
+### Environment Variables
+
+For local development:
+
+- Frontend: Create a `.env.local` file in the frontend directory with `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`
+- Backend: No environment variables required
+
+For production:
+
+- Frontend: Vercel environment variables are set to connect to the Render backend
+- Backend: The CORS settings are configured to allow requests from the Vercel frontend

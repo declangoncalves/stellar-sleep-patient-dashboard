@@ -25,7 +25,7 @@ export default function PatientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const [sortColumn, setSortColumn] = useState('last_name');
+  const [sortColumn, setSortColumn] = useState('first_name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const {
@@ -136,7 +136,7 @@ export default function PatientsPage() {
   };
 
   const fieldMap: Record<string, string> = {
-    name: 'last_name',
+    name: 'first_name',
     status: 'status',
     location: 'addresses__city',
     age: 'date_of_birth',

@@ -25,10 +25,10 @@ class PatientViewSet(viewsets.ModelViewSet):
     search_fields = ["first_name", "last_name"]
     filterset_class = PatientFilter
     ordering_fields = [
-        'last_name', 'first_name', 'status', 'date_of_birth', 'last_visit',
+        'first_name', 'last_name', 'status', 'date_of_birth', 'last_visit',
         'addresses__city', 'isi_scores__score'
     ]
-    ordering = ['last_name', 'first_name']  # default ordering
+    ordering = ['first_name', 'last_name']  # default ordering
 
     def get_queryset(self):
         queryset = super().get_queryset()

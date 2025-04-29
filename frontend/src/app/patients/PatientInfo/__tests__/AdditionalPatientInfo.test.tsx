@@ -78,8 +78,8 @@ describe('AdditionalPatientInfo', () => {
     // Wait for loading to complete and fields to be rendered
     await waitFor(
       () => {
-        expect(screen.getByText('Allergies')).toBeInTheDocument();
-        expect(screen.getByText('Medications')).toBeInTheDocument();
+      expect(screen.getByText('Allergies')).toBeInTheDocument();
+      expect(screen.getByText('Medications')).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
@@ -120,7 +120,7 @@ describe('AdditionalPatientInfo', () => {
     // Wait for the field to be added and loading to complete
     await waitFor(
       () => {
-        expect(screen.getByText('New Field')).toBeInTheDocument();
+      expect(screen.getByText('New Field')).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
